@@ -266,11 +266,13 @@
                         <i data-lucide="cpu" class="w-3 h-3"></i>
                         <span data-i18n="aiModelLabel">AI Model</span>
                     </label>
+
                     <select id="ai-model" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
-                        <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Recommended)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fallback)</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Terbaru)</option>
+                        <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Stable)</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (High Accuracy)</option>
                     </select>
+
                 </div>
 
                 <!-- OCR Language (for offline mode) -->
@@ -1080,10 +1082,53 @@ document.addEventListener('click', () => exportMenu.classList.remove('open'));
 
 exportWordBtn.addEventListener('click', () => {
     exportMenu.classList.remove('open');
-    const text = resultText.value;
-    if (!text) { showToast(t('noTextError'), true); return; }
-    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><style>body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.6;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #000;padding:6px;}th{background:#f2f2f2;}</style></head><body>${marked.parse(text)}</body></html>`;
-    triggerDownload(new Blob(['\ufeff', html], {type:'application/msword'}), `WebOCR_${Date.now()}.doc`);
+    
+    // Pastikan ada dokumen yang diekstrak
+    if (!documents || documents.length === 0) { 
+        showToast(t('noDataExportError'), true); 
+        return; 
+    }
+
+    let combinedText = "";
+    let hasText = false;
+
+    // Looping semua tab/dokumen untuk digabungkan
+    documents.forEach((doc, index) => {
+        if (doc.text && doc.text.trim() !== '') {
+            hasText = true;
+            // Menambahkan judul tiap tab
+            combinedText += `<h2>${doc.title || `File ${index + 1}`}</h2>\n`;
+            // Menambahkan isi teksnya (dikonversi pakai marked)
+            combinedText += marked.parse(doc.text);
+            // Menambahkan page break (halaman baru) untuk dokumen berikutnya, kecuali yang terakhir
+            if (index < documents.length - 1) {
+                combinedText += `<br clear="all" style="page-break-before:always" />`;
+            }
+        }
+    });
+
+    if (!hasText) { 
+        showToast(t('noTextError'), true); 
+        return; 
+    }
+
+    // Template HTML untuk Word
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+        <meta charset='utf-8'>
+        <style>
+            body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.6;}
+            table{border-collapse:collapse;width:100%;margin-bottom:15px;}
+            th,td{border:1px solid #000;padding:6px;}
+            th{background:#f2f2f2;}
+            h2{color:#4f46e5; border-bottom: 1px solid #ccc; padding-bottom: 5px;}
+        </style>
+    </head>
+    <body>${combinedText}</body>
+    </html>`;
+
+    // Proses Download
+    triggerDownload(new Blob(['\ufeff', html], {type:'application/msword'}), `WebOCR_All_Tabs_${Date.now()}.doc`);
     showToast(t('wordExportToast'));
 });
 
