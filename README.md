@@ -223,12 +223,6 @@ Angga Conni Saputra
 
 Cultural heritage, digital governance, and lightweight civic-tech enthusiast focused on practical tools for real-world workflows.
 
-📜 License
-
-MIT License
-
-Feel free to use, modify, and contribute.
-
 ⭐ Support
 
 If you find this project useful:
