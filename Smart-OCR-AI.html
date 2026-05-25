@@ -605,7 +605,7 @@ const LANGS = {
         aiAnalyzing: "AI analyzing...",
         // AI Prompts
         promptText: "Extract all text from this image with high accuracy. Understand the structure — if there are multiple columns or separate text blocks, read in natural reading order. Do NOT describe the image, only provide the pure text extraction.",
-        promptTable: "Carefully analyze this image and extract all data. Format the output strictly as a Markdown table (using pipe '|' as column separator). If the image doesn't appear as a neat table, still organize the data into a clear structure.",
+        promptTable: "Extract all data from this image and format it STRICTLY as a Markdown table. Do NOT include any introductory text, explanations, or conversational fillers. ONLY output the Markdown table starting with the header row and ensure you include the separator row (e.g., |---|---|).",
         promptChart: "Comprehensively analyze the diagram, graph, or chart in this image. Extract the main data points. Explain what the X/Y axes or legend mean. Then provide a narrative summary (insight) about what the chart conveys. Respond in English.",
         promptSummary: "Summarize the main content of this document image. Extract key points, main topics, and important details. Present the summary in a clear, structured format with bullet points where appropriate. Respond in English.",
     },
@@ -676,7 +676,7 @@ const LANGS = {
         aiAnalyzing: "AI sedang menganalisis...",
         // AI Prompts
         promptText: "Ekstrak seluruh teks dari gambar ini dengan sangat akurat. Perhatikan strukturnya, jika ada multi-kolom atau blok teks terpisah, baca sesuai urutan alami. JANGAN buat deskripsi gambar, cukup ekstraksi teks murni.",
-        promptTable: "Analisis gambar ini dan ekstrak semua data. Format hasilnya sebagai tabel Markdown (gunakan '|' sebagai pemisah kolom). Susun data secara rapi dan terorganisir.",
+        promptTable: "Ekstrak semua data dari gambar ini dan format HANYA sebagai tabel Markdown. JANGAN berikan teks pengantar, basa-basi, atau penjelasan apapun. HANYA keluarkan tabel Markdown yang diawali dengan baris header dan pastikan ada baris pemisah (contoh: |---|---|).",
         promptChart: "Analisis diagram, grafik, atau chart secara komprehensif. Ekstrak data utama, jelaskan sumbu X/Y atau legenda, dan berikan ringkasan naratif (insight). Jawab dalam Bahasa Indonesia.",
         promptSummary: "Rangkum konten utama dari gambar dokumen ini. Ekstrak poin-poin kunci, topik utama, dan detail penting dalam format yang jelas dan terstruktur. Jawab dalam Bahasa Indonesia.",
     }
