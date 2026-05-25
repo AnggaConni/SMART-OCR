@@ -1105,7 +1105,7 @@ async function processPDF(file) {
     try {
         const buf = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-        const pages = Math.min(pdf.numPages, 50);
+        const pages = Math.min(pdf.numPages, 35);
         for (let i = 1; i <= pages; i++) {
             const page = await pdf.getPage(i);
             const vp = page.getViewport({ scale: 1.8 });
