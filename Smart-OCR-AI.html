@@ -1,837 +1,1173 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Teks Pintar (OCR)</title>
-    <!-- Tailwind CSS untuk Styling -->
+    <title>WebOCR Pro + AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tesseract.js untuk Engine OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <!-- PDF.js untuk membaca file PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- Marked.js untuk render Markdown ke HTML (Word Export) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .drop-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
+        :root {
+            --blue-vivid: #2563eb;
+            --blue-soft: #eff6ff;
+            --indigo: #4f46e5;
+            --indigo-soft: #eef2ff;
+            --surface: #ffffff;
+            --bg: #f1f5f9;
+            --border: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(at 20% 10%, rgba(99,102,241,0.06) 0px, transparent 50%),
+                radial-gradient(at 80% 90%, rgba(37,99,235,0.06) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
+
+        /* Spinner */
         .loader {
-            border: 3px solid #f3f3f3;
+            border: 2px solid #e2e8f0;
             border-radius: 50%;
-            border-top: 3px solid #3b82f6;
-            width: 24px;
-            height: 24px;
-            -webkit-animation: spin 1s linear infinite; /* Safari */
-            animation: spin 1s linear infinite;
+            border-top: 2px solid var(--indigo);
+            animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Font monospace untuk tabel agar rapi */
-        .font-mono-table { font-family: 'Courier New', Courier, monospace; }
-        
-        /* Shake animation untuk API Key kosong */
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Mono font for tables */
+        .font-mono-table { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+        /* Shake */
         @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-4px); }
-            75% { transform: translateX(4px); }
+            0%,100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
         .animate-shake { animation: shake 0.3s ease-in-out 2; }
+
+        /* Lang toggle */
+        .lang-toggle { display: flex; background: #f1f5f9; border-radius: 8px; padding: 2px; border: 1px solid var(--border); }
+        .lang-btn {
+            padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s; color: var(--muted); border: none; background: transparent;
+        }
+        .lang-btn.active { background: var(--surface); color: var(--indigo); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* Tabs */
+        .tab-item {
+            display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+            border-radius: 8px 8px 0 0; cursor: pointer; font-size: 13px; font-weight: 500;
+            transition: all 0.15s; user-select: none; border: 1px solid transparent;
+            border-bottom: none; white-space: nowrap; max-width: 140px;
+        }
+        .tab-item.active {
+            background: white; border-color: var(--border);
+            color: var(--indigo); box-shadow: 0 -2px 8px rgba(79,70,229,0.08);
+        }
+        .tab-item:not(.active) { background: #f8fafc; color: var(--muted); }
+        .tab-item:not(.active):hover { background: #f1f5f9; color: var(--text); }
+
+        /* Search highlight effect */
+        .search-highlight-bar { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+
+        /* Stat badge */
+        .stat-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 99px;
+            font-size: 11px; font-weight: 600; color: var(--muted);
+            background: #f8fafc; border: 1px solid var(--border);
+        }
+
+        /* Export dropdown */
+        .export-dropdown { position: relative; display: inline-block; }
+        .export-menu {
+            position: absolute; bottom: 110%; right: 0;
+            background: white; border: 1px solid var(--border); border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 160px;
+            overflow: hidden; z-index: 100;
+            opacity: 0; pointer-events: none; transform: translateY(6px);
+            transition: all 0.15s;
+        }
+        .export-menu.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .export-menu-item {
+            display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+            font-size: 13px; font-weight: 500; cursor: pointer;
+            transition: background 0.1s; color: var(--text);
+        }
+        .export-menu-item:hover { background: var(--indigo-soft); color: var(--indigo); }
+
+        /* Image zoom */
+        #image-preview { transition: transform 0.2s ease; transform-origin: center; cursor: zoom-in; }
+        #image-preview.zoomed { transform: scale(2); cursor: zoom-out; }
+
+        /* Drop zone active */
+        .drop-active { border-color: var(--indigo) !important; background: var(--indigo-soft) !important; }
+
+        /* Toast */
+        #toast {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Mode pills */
+        .mode-info {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .mode-offline { background: #dcfce7; color: #16a34a; }
+        .mode-ai { background: var(--indigo-soft); color: var(--indigo); }
+
+        textarea { caret-color: var(--indigo); }
+
+        /* Clear all btn */
+        #clear-all-btn { transition: all 0.15s; }
+        #clear-all-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+
+        /* Zoom controls */
+        .zoom-controls { display: flex; gap: 2px; align-items: center; }
+        .zoom-btn {
+            width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border);
+            background: white; cursor: pointer; font-size: 14px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; color: var(--muted);
+            transition: all 0.1s;
+        }
+        .zoom-btn:hover { background: var(--indigo-soft); color: var(--indigo); border-color: #c7d2fe; }
+
+        /* Pulse dot */
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.7); }
+        }
+        .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
     </style>
 </head>
-<body class="text-gray-800 h-screen flex flex-col">
+<body>
 
-    <!-- Header -->
-    <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0 flex-wrap gap-4">
-        <div class="flex items-center gap-3">
-            <div class="bg-blue-600 p-2 rounded-lg text-white">
-                <i data-lucide="scan-text"></i>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold text-gray-900 leading-tight">WebOCR Pro + AI</h1>
-                <p class="text-xs text-gray-500">Ekstrak Teks, Tabel, & Analisis Diagram secara Pintar</p>
-            </div>
+<!-- Header -->
+<header class="bg-white/90 backdrop-blur border-b border-gray-200 px-5 py-3 flex items-center justify-between shadow-sm shrink-0 flex-wrap gap-3 sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+        <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl text-white shadow-md">
+            <i data-lucide="scan-text" class="w-5 h-5"></i>
         </div>
-        
-        <!-- Controls & BYOK -->
-        <div class="flex items-center gap-3">
-            <!-- BYOK Input Area -->
-            <div id="api-key-container" class="flex items-center gap-2 bg-gray-50 border border-gray-300 px-3 py-2 rounded-lg focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all duration-300">
-                <i data-lucide="key" class="w-4 h-4 text-gray-500"></i>
-                <input type="password" id="api-key-input" placeholder="Masukkan Gemini API Key..." class="bg-transparent border-none outline-none text-sm w-48 text-gray-700 placeholder-gray-400" autocomplete="off">
-                <button id="toggle-key-btn" class="text-gray-400 hover:text-indigo-600 transition-colors focus:outline-none" title="Lihat/Sembunyikan Key">
-                    <i data-lucide="eye" class="w-4 h-4" id="toggle-key-icon"></i>
-                </button>
-            </div>
-
-            <!-- JSON Data Buttons -->
-            <button id="import-json-btn" class="hidden md:flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors" title="Load JSON">
-                <i data-lucide="upload" class="w-4 h-4"></i>
-            </button>
-            <button id="export-json-btn" class="hidden md:flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors" title="Save JSON">
-                <i data-lucide="download" class="w-4 h-4"></i>
-            </button>
-            <input type="file" id="json-input" class="hidden" accept=".json">
+        <div>
+            <h1 class="text-lg font-bold text-gray-900 leading-tight" data-i18n="appTitle">WebOCR Pro + AI</h1>
+            <p class="text-xs text-gray-400" data-i18n="appSubtitle">Extract Text, Tables & Diagram Analysis</p>
         </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="flex-grow flex flex-col lg:flex-row gap-6 p-6 overflow-hidden h-full">
-        
-        <!-- Kolom Kiri: Input Zone -->
-        <section class="w-full lg:w-1/3 flex flex-col gap-4 overflow-hidden relative">
-            
-            <!-- Area Paste/Upload -->
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col shrink-0">
-                <div class="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                    <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
-                        <i data-lucide="image-plus" class="w-4 h-4"></i> Area Input Dokumen
-                    </h2>
-                </div>
-                <div class="p-4">
-                    <!-- Dropzone -->
-                    <div id="dropzone" tabindex="0" class="w-full border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-center transition-all duration-200 hover:bg-gray-50 hover:border-blue-400 focus:border-blue-500 focus:bg-blue-50 focus:ring-4 focus:ring-blue-100 outline-none cursor-text relative py-6">
-                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-2">
-                            <i data-lucide="mouse-pointer-click" class="w-5 h-5 animate-pulse"></i>
-                        </div>
-                        <h3 class="text-sm font-semibold text-gray-800 mb-1 pointer-events-none">Klik, Lalu <kbd class="bg-white border border-gray-300 rounded px-1 shadow-sm text-blue-600 font-mono text-xs mx-1">Ctrl + V</kbd></h3>
-                        <p class="text-xs text-gray-500 mb-3 pointer-events-none">atau drop file Gambar / PDF</p>
-                        <button class="bg-white border shadow-sm border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors pointer-events-auto z-10" onclick="document.getElementById('file-input').click()">
-                            Pilih File Manual
-                        </button>
-                        <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/jpg, image/webp, application/pdf">
-                    </div>
-
-                    <!-- Pilihan Mode AI & Engine -->
-                    <div class="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex flex-col gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-indigo-900 mb-1 flex items-center gap-1">
-                                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-600"></i> Mode Pemindaian
-                            </label>
-                            <select id="scan-mode" class="w-full bg-white border border-indigo-200 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none shadow-sm cursor-pointer">
-                                <option value="offline" selected>⚡ Standar: Teks Biasa (Offline Tesseract)</option>
-                                <option value="ai-text">🧠 AI Cerdas: Teks & Layout Kompleks</option>
-                                <option value="ai-table">📊 AI Cerdas: Ekstrak ke Tabel</option>
-                                <option value="ai-chart">📈 AI Cerdas: Analisis Diagram/Grafik</option>
-                            </select>
-                        </div>
-                        
-                        <div id="ai-model-container" class="hidden">
-                            <label class="block text-xs font-bold text-indigo-900 mb-1 flex items-center gap-1">
-                                <i data-lucide="cpu" class="w-3.5 h-3.5 text-indigo-600"></i> Model AI
-                            </label>
-                            <select id="ai-model" class="w-full bg-white border border-indigo-200 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none shadow-sm cursor-pointer">
-                                <option value="gemini-3.1-flash">Gemini 3.1 Flash (Tercepat & Cerdas)</option>
-                                <option value="gemini-2.5-flash-preview-09-2025" selected>Gemini 2.5 Flash (Stabil)</option>
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fallback)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Area Preview Gambar Aktif -->
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col flex-grow overflow-hidden">
-                <div class="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
-                    <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
-                        <i data-lucide="image" class="w-4 h-4"></i> Preview (Tab Aktif)
-                    </h2>
-                </div>
-                <div class="flex-grow relative bg-gray-100 p-2 overflow-hidden flex items-center justify-center min-h-[150px]">
-                    <img id="image-preview" src="" alt="Preview" class="hidden max-w-full max-h-full object-contain rounded shadow-sm border border-gray-200 bg-white">
-                    <div id="empty-preview-state" class="text-gray-400 text-sm flex flex-col items-center">
-                        <i data-lucide="image-off" class="w-8 h-8 mb-2 opacity-50"></i>
-                        Pilih tab di sebelah kanan
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Kolom Kanan: Output Zone -->
-        <section class="w-full lg:w-2/3 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden relative">
-            
-            <div class="border-b border-gray-100 bg-gray-50 flex flex-col shrink-0">
-                <div class="p-3 flex justify-between items-center">
-                    <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
-                        <i data-lucide="file-text" class="w-4 h-4"></i> Hasil Ekstraksi
-                    </h2>
-                    <!-- Progress Bar Container -->
-                    <div id="progress-container" class="hidden flex items-center gap-2 text-xs text-indigo-600 font-medium">
-                        <div class="loader" style="width: 16px; height: 16px; border-width: 2px; border-top-color: #4f46e5;"></div>
-                        <span id="progress-text">Memproses: 0%</span>
-                    </div>
-                </div>
-                <!-- Tabs Container -->
-                <div id="tabs-container" class="flex overflow-x-auto border-t border-gray-200 bg-gray-100 px-2 pt-2 gap-1 items-end min-h-[42px]">
-                    <!-- Tabs will be generated here -->
-                </div>
-            </div>
-
-            <!-- Textarea Editor -->
-            <div class="flex-grow p-4 relative">
-                <textarea id="result-text" class="w-full h-full resize-none outline-none text-gray-800 bg-transparent leading-relaxed" placeholder="Teks, tabel, atau rangkuman diagram hasil scan akan muncul di sini... Anda bebas mengedit hasil ini." disabled></textarea>
-                
-                <!-- Overlay saat menunggu gambar -->
-                <div id="empty-state-overlay" class="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-400 pointer-events-none z-10">
-                    <i data-lucide="files" class="w-12 h-12 mb-3 opacity-50"></i>
-                    <p class="text-sm">Belum ada file. Silakan Paste / Upload dokumen di sebelah kiri.</p>
-                </div>
-            </div>
-
-            <!-- Action Buttons Footer -->
-            <div class="p-4 border-t border-gray-100 bg-gray-50 flex gap-3 justify-end shrink-0">
-                <button id="copy-btn" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm" disabled>
-                    <i data-lucide="copy" class="w-4 h-4"></i> Copy Hasil
-                </button>
-                <button id="export-btn" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm shadow-sm" disabled>
-                    <i data-lucide="file-down" class="w-4 h-4"></i> Export ke Word
-                </button>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 pointer-events-none max-w-sm">
-        <span id="toast-icon-success"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-400"></i></span>
-        <span id="toast-icon-error" class="hidden"><i data-lucide="alert-circle" class="w-5 h-5 text-red-400"></i></span>
-        <span id="toast-message" class="text-sm font-medium">Notifikasi</span>
     </div>
 
-    <!-- Scripts -->
-    <script>
-        // Inisialisasi Icon
-        lucide.createIcons();
+    <div class="flex items-center gap-2 flex-wrap">
+        <!-- Language Toggle -->
+        <div class="lang-toggle">
+            <button class="lang-btn active" id="btn-lang-en" onclick="setLang('en')">EN</button>
+            <button class="lang-btn" id="btn-lang-id" onclick="setLang('id')">ID</button>
+        </div>
 
-        // Konfigurasi Worker untuk PDF.js
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        <!-- API Key -->
+        <div id="api-key-container" class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+            <i data-lucide="key" class="w-3.5 h-3.5 text-gray-400"></i>
+            <input type="password" id="api-key-input" class="bg-transparent border-none outline-none text-sm w-44 text-gray-700 placeholder-gray-400" autocomplete="off">
+            <button id="toggle-key-btn" class="text-gray-400 hover:text-indigo-600 transition-colors">
+                <i data-lucide="eye" class="w-3.5 h-3.5" id="toggle-key-icon"></i>
+            </button>
+        </div>
 
-        // Elemen DOM
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('file-input');
-        const imagePreview = document.getElementById('image-preview');
-        const emptyPreviewState = document.getElementById('empty-preview-state');
-        
-        const scanModeSelect = document.getElementById('scan-mode');
-        const aiModelContainer = document.getElementById('ai-model-container');
-        const aiModelSelect = document.getElementById('ai-model');
-        
-        const apiKeyInput = document.getElementById('api-key-input');
-        const apiKeyContainer = document.getElementById('api-key-container');
-        const toggleKeyBtn = document.getElementById('toggle-key-btn');
-        const toggleKeyIcon = document.getElementById('toggle-key-icon');
+        <!-- JSON Buttons -->
+        <button id="import-json-btn" class="hidden md:flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-200">
+            <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+            <span class="hidden lg:inline" data-i18n="importTooltip">Import</span>
+        </button>
+        <button id="export-json-btn" class="hidden md:flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-200">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i>
+            <span class="hidden lg:inline" data-i18n="exportTooltip">Save</span>
+        </button>
+        <input type="file" id="json-input" class="hidden" accept=".json">
 
-        const tabsContainer = document.getElementById('tabs-container');
-        const resultText = document.getElementById('result-text');
-        const emptyStateOverlay = document.getElementById('empty-state-overlay');
-        const progressContainer = document.getElementById('progress-container');
-        const progressText = document.getElementById('progress-text');
-        
-        const copyBtn = document.getElementById('copy-btn');
-        const exportBtn = document.getElementById('export-btn');
-        const exportJsonBtn = document.getElementById('export-json-btn');
-        const importJsonBtn = document.getElementById('import-json-btn');
-        const jsonInput = document.getElementById('json-input');
-        
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toast-message');
-        const toastIconSuccess = document.getElementById('toast-icon-success');
-        const toastIconError = document.getElementById('toast-icon-error');
+        <!-- Clear All -->
+        <button id="clear-all-btn" class="hidden md:flex items-center gap-1 text-xs bg-gray-50 text-gray-500 px-3 py-1.5 rounded-lg border border-gray-200 font-medium" data-i18n="clearAll">
+            Clear All
+        </button>
+    </div>
+</header>
 
-        // --- STATE MANAGEMENT ---
-        let documents = [];
-        let activeDocId = null;
-        let globalProcessingLock = false; 
+<!-- Main -->
+<main class="flex-grow flex flex-col lg:flex-row gap-4 p-4 overflow-hidden">
 
-        // Auto-load dari LocalStorage
-        function loadData() {
-            try {
-                // Load API Key
-                const savedKey = localStorage.getItem('gemini_api_key');
-                if (savedKey) apiKeyInput.value = savedKey;
+    <!-- LEFT: Input -->
+    <section class="w-full lg:w-80 xl:w-96 flex flex-col gap-3 shrink-0 overflow-y-auto">
 
-                // Load Docs
-                const saved = localStorage.getItem('webocr_data');
-                if (saved) {
-                    documents = JSON.parse(saved);
-                    documents.forEach(d => d.isProcessing = false);
-                    if (documents.length > 0) {
-                        activeDocId = documents[documents.length - 1].id;
-                    }
-                }
-            } catch (e) {
-                console.error("Gagal memuat data lokal", e);
-            }
+        <!-- Upload Zone -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center gap-2">
+                <i data-lucide="image-plus" class="w-4 h-4 text-indigo-500"></i>
+                <span class="font-semibold text-gray-700 text-sm" data-i18n="inputAreaTitle">Document Input</span>
+            </div>
+            <div class="p-4">
+                <div id="dropzone" tabindex="0"
+                    class="border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-center p-6 transition-all cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/40 focus:outline-none focus:border-indigo-400 focus:bg-indigo-50/40 relative">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-3 shadow-lg shadow-blue-200">
+                        <i data-lucide="mouse-pointer-click" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-700 mb-1">
+                        <span data-i18n="clickPaste">Click, then</span> <kbd class="bg-white border border-gray-300 rounded px-1.5 py-0.5 text-indigo-600 font-mono text-xs shadow-sm mx-1">Ctrl+V</kbd>
+                    </p>
+                    <p class="text-xs text-gray-400 mb-3" data-i18n="orDrop">or drop Image / PDF files here</p>
+                    <div class="flex gap-2">
+                        <button class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-sm" onclick="document.getElementById('file-input').click()">
+                            <span data-i18n="chooseFile">Choose File</span>
+                        </button>
+                        <button class="bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-50 transition-colors" onclick="document.getElementById('multi-file-input').click()">
+                            <span data-i18n="batchUpload">Batch</span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <i data-lucide="layers" class="w-3 h-3"></i>
+                        <span data-i18n="multipleFiles">Supports multiple files</span>
+                    </p>
+                    <input type="file" id="file-input" class="hidden" accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf">
+                    <input type="file" id="multi-file-input" class="hidden" accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf" multiple>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode + Model -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4 h-4 text-indigo-500"></i>
+                <span class="font-semibold text-gray-700 text-sm" data-i18n="scanModeLabel">Scan Mode</span>
+            </div>
+            <div class="p-4 flex flex-col gap-3">
+                <select id="scan-mode" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer transition-all">
+                    <option value="offline" data-i18n-opt="modeOffline">⚡ Standard: Plain Text (Offline OCR)</option>
+                    <option value="ai-text" data-i18n-opt="modeAiText">🧠 Smart AI: Text &amp; Complex Layouts</option>
+                    <option value="ai-table" data-i18n-opt="modeAiTable">📊 Smart AI: Extract to Table</option>
+                    <option value="ai-chart" data-i18n-opt="modeAiChart">📈 Smart AI: Analyze Charts/Diagrams</option>
+                    <option value="ai-summary" data-i18n-opt="modeAiSummary">📝 Smart AI: Summarize Document</option>
+                </select>
+
+                <div id="ai-model-container" class="hidden">
+                    <label class="block text-xs font-bold text-gray-500 mb-1.5 flex items-center gap-1">
+                        <i data-lucide="cpu" class="w-3 h-3"></i>
+                        <span data-i18n="aiModelLabel">AI Model</span>
+                    </label>
+                    <select id="ai-model" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
+                        <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Recommended)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fallback)</option>
+                    </select>
+                </div>
+
+                <!-- OCR Language (for offline mode) -->
+                <div id="ocr-lang-container">
+                    <label class="block text-xs font-bold text-gray-500 mb-1.5 flex items-center gap-1">
+                        <i data-lucide="globe" class="w-3 h-3"></i>
+                        <span data-i18n="ocrLangLabel">OCR Language</span>
+                    </label>
+                    <select id="ocr-lang" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
+                        <option value="eng">English</option>
+                        <option value="ind">Indonesian</option>
+                        <option value="ind+eng" selected>Indonesian + English</option>
+                        <option value="chi_sim">Chinese (Simplified)</option>
+                        <option value="jpn">Japanese</option>
+                        <option value="kor">Korean</option>
+                        <option value="fra">French</option>
+                        <option value="deu">German</option>
+                        <option value="spa">Spanish</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Preview -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden flex-grow min-h-[180px]">
+            <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between shrink-0">
+                <span class="font-semibold text-gray-700 text-sm flex items-center gap-2">
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <span data-i18n="previewTitle">Preview</span>
+                </span>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" id="zoom-out-btn" title="Zoom Out">−</button>
+                    <span id="zoom-level" class="text-xs font-mono text-gray-400 w-10 text-center">100%</span>
+                    <button class="zoom-btn" id="zoom-in-btn" title="Zoom In">+</button>
+                    <button class="zoom-btn" id="zoom-reset-btn" title="Reset Zoom">⊙</button>
+                </div>
+            </div>
+            <div class="flex-grow relative overflow-auto bg-gray-100 flex items-center justify-center p-3 min-h-[160px]" id="preview-wrapper">
+                <img id="image-preview" src="" alt="Preview" class="hidden max-w-full max-h-full object-contain rounded-lg shadow border border-gray-200 bg-white">
+                <div id="empty-preview-state" class="text-gray-400 flex flex-col items-center text-sm">
+                    <i data-lucide="image-off" class="w-8 h-8 mb-2 opacity-40"></i>
+                    <span data-i18n="selectTabHint">Select a tab on the right</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- RIGHT: Output -->
+    <section class="flex-grow flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-w-0">
+
+        <!-- Top bar -->
+        <div class="border-b border-gray-100 shrink-0">
+            <div class="px-4 pt-3 flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span data-i18n="resultsTitle">Extraction Results</span>
+                </h2>
+                <div class="flex items-center gap-2">
+                    <!-- Stats -->
+                    <span class="stat-badge" id="word-count-badge"><i data-lucide="type" class="w-3 h-3"></i> <span id="word-count">0</span> <span data-i18n="words">words</span></span>
+                    <span class="stat-badge" id="char-count-badge"><i data-lucide="hash" class="w-3 h-3"></i> <span id="char-count">0</span> <span data-i18n="chars">chars</span></span>
+
+                    <!-- Progress -->
+                    <div id="progress-container" class="hidden items-center gap-2 text-xs text-indigo-600 font-semibold">
+                        <div class="loader" style="width:14px;height:14px;border-width:2px;"></div>
+                        <span id="progress-text">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search bar -->
+            <div class="px-4 py-2">
+                <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-gray-400 shrink-0"></i>
+                    <input id="search-input" type="text" class="flex-grow bg-transparent outline-none text-sm text-gray-700 placeholder-gray-400" autocomplete="off">
+                    <span id="search-count" class="text-xs text-gray-400 font-medium shrink-0 hidden"></span>
+                    <div class="flex gap-1 shrink-0">
+                        <button id="search-prev" class="w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled>
+                            <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button id="search-next" class="w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button id="search-clear" class="w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 hidden transition-colors">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div id="tabs-container" class="flex overflow-x-auto px-3 pb-0 gap-1 items-end min-h-[38px] border-t border-gray-100 bg-gray-50/60"></div>
+        </div>
+
+        <!-- Textarea -->
+        <div class="flex-grow p-4 relative overflow-hidden">
+            <textarea id="result-text" class="w-full h-full resize-none outline-none text-gray-800 bg-transparent leading-relaxed text-sm" disabled></textarea>
+            <div id="empty-state-overlay" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center text-gray-400 pointer-events-none z-10">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mb-3">
+                    <i data-lucide="files" class="w-8 h-8 text-indigo-400"></i>
+                </div>
+                <p class="text-sm font-medium" data-i18n="noFileHint">No file yet. Paste / Upload a document.</p>
+            </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/60 flex items-center justify-between gap-3 shrink-0">
+            <div class="flex items-center gap-2">
+                <span id="active-mode-badge" class="mode-info hidden mode-offline">OFFLINE</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="copy-btn" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-sm shadow-sm" disabled>
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    <span data-i18n="copyBtn">Copy</span>
+                </button>
+
+                <!-- Export Dropdown -->
+                <div class="export-dropdown" id="export-dropdown">
+                    <button id="export-main-btn" class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-sm shadow-md shadow-blue-200" disabled>
+                        <i data-lucide="file-down" class="w-4 h-4"></i>
+                        <span data-i18n="exportBtn">Export</span>
+                        <i data-lucide="chevron-up" class="w-3.5 h-3.5 opacity-70"></i>
+                    </button>
+                    <div class="export-menu" id="export-menu">
+                        <div class="export-menu-item" id="export-word-btn">
+                            <i data-lucide="file-type-2" class="w-4 h-4 text-blue-500"></i>
+                            <span data-i18n="exportWordBtn">Export as Word</span>
+                        </div>
+                        <div class="export-menu-item" id="export-txt-btn">
+                            <i data-lucide="file-text" class="w-4 h-4 text-green-500"></i>
+                            <span data-i18n="exportTxtBtn">Export as TXT</span>
+                        </div>
+                        <div class="export-menu-item" id="export-md-btn">
+                            <i data-lucide="code" class="w-4 h-4 text-purple-500"></i>
+                            <span data-i18n="exportMdBtn">Export as Markdown</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-5 right-5 translate-y-16 opacity-0 bg-gray-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 z-50 pointer-events-none max-w-xs">
+    <span id="toast-icon-success"><i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i></span>
+    <span id="toast-icon-error" class="hidden"><i data-lucide="alert-circle" class="w-5 h-5 text-red-400"></i></span>
+    <span id="toast-message" class="text-sm font-medium"></span>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+lucide.createIcons();
+
+// ─── TRANSLATIONS ───────────────────────────────────────────────────────────
+const LANGS = {
+    en: {
+        appTitle: "WebOCR Pro + AI",
+        appSubtitle: "Extract Text, Tables & Diagram Analysis — AI-Powered",
+        apiKeyPlaceholder: "Enter Gemini API Key...",
+        importTooltip: "Import",
+        exportTooltip: "Save",
+        clearAll: "Clear All",
+        inputAreaTitle: "Document Input",
+        clickPaste: "Click, then",
+        orDrop: "or drop Image / PDF files here",
+        chooseFile: "Choose File",
+        batchUpload: "Batch",
+        multipleFiles: "Supports multiple files",
+        scanModeLabel: "Scan Mode",
+        modeOffline: "⚡ Standard: Plain Text (Offline OCR)",
+        modeAiText: "🧠 Smart AI: Text & Complex Layouts",
+        modeAiTable: "📊 Smart AI: Extract to Table",
+        modeAiChart: "📈 Smart AI: Analyze Charts/Diagrams",
+        modeAiSummary: "📝 Smart AI: Summarize Document",
+        aiModelLabel: "AI Model",
+        ocrLangLabel: "OCR Language",
+        previewTitle: "Preview (Active Tab)",
+        selectTabHint: "Select a tab on the right",
+        resultsTitle: "Extraction Results",
+        noFileHint: "No file yet. Paste / Upload a document on the left.",
+        editablePlaceholder: "Extracted text, tables, or summaries will appear here... Feel free to edit.",
+        searchPlaceholder: "Find in text...",
+        searchMatch: "match",
+        searchMatches: "matches",
+        words: "words",
+        chars: "chars",
+        copyBtn: "Copy",
+        exportBtn: "Export",
+        exportWordBtn: "Export as Word",
+        exportTxtBtn: "Export as TXT",
+        exportMdBtn: "Export as Markdown",
+        // Toasts
+        storageFullToast: "Browser storage full. Delete old tabs.",
+        processingLockToast: "Please wait, system is processing!",
+        apiKeyRequiredToast: "Gemini API Key is required for AI Mode!",
+        fileTypeError: "Please upload an Image or PDF file!",
+        pdfExtractingToast: "Extracting PDF pages...",
+        pdfDoneToast: n => `Done processing ${n} PDF page(s)!`,
+        pdfErrorToast: "Failed to read PDF structure.",
+        tabDeletedToast: "Tab deleted",
+        tabProcessingToast: "Tab is processing, cannot delete!",
+        copiedToast: "Text copied!",
+        wordExportToast: "Exported to Word!",
+        txtExportToast: "Exported to TXT!",
+        mdExportToast: "Exported to Markdown!",
+        jsonExportToast: "JSON backup downloaded",
+        jsonImportToast: "Data loaded from JSON",
+        jsonImportWaitToast: "Wait for processing to finish before importing JSON",
+        jsonFormatError: "Invalid JSON format!",
+        jsonReadError: "Failed to read JSON file!",
+        noDataExportError: "No data to export",
+        noTextError: "No text to export",
+        clearAllConfirm: "Clear all tabs?",
+        aiProcessingToast: model => `✨ Processing with ${model}...`,
+        // Progress
+        preparingEngine: "Preparing engine...",
+        readingOffline: p => `Reading Offline: ${p}%`,
+        sendingToAI: model => `Sending to ${model}...`,
+        localEngineReading: "Local engine reading...",
+        aiAnalyzing: "AI analyzing...",
+        // AI Prompts
+        promptText: "Extract all text from this image with high accuracy. Understand the structure — if there are multiple columns or separate text blocks, read in natural reading order. Do NOT describe the image, only provide the pure text extraction.",
+        promptTable: "Carefully analyze this image and extract all data. Format the output strictly as a Markdown table (using pipe '|' as column separator). If the image doesn't appear as a neat table, still organize the data into a clear structure.",
+        promptChart: "Comprehensively analyze the diagram, graph, or chart in this image. Extract the main data points. Explain what the X/Y axes or legend mean. Then provide a narrative summary (insight) about what the chart conveys. Respond in English.",
+        promptSummary: "Summarize the main content of this document image. Extract key points, main topics, and important details. Present the summary in a clear, structured format with bullet points where appropriate. Respond in English.",
+    },
+    id: {
+        appTitle: "WebOCR Pro + AI",
+        appSubtitle: "Ekstrak Teks, Tabel, & Analisis Diagram secara Pintar",
+        apiKeyPlaceholder: "Masukkan Gemini API Key...",
+        importTooltip: "Import",
+        exportTooltip: "Simpan",
+        clearAll: "Hapus Semua",
+        inputAreaTitle: "Area Input Dokumen",
+        clickPaste: "Klik, Lalu",
+        orDrop: "atau drop file Gambar / PDF di sini",
+        chooseFile: "Pilih File",
+        batchUpload: "Batch",
+        multipleFiles: "Mendukung banyak file",
+        scanModeLabel: "Mode Pemindaian",
+        modeOffline: "⚡ Standar: Teks Biasa (Offline OCR)",
+        modeAiText: "🧠 AI Cerdas: Teks & Layout Kompleks",
+        modeAiTable: "📊 AI Cerdas: Ekstrak ke Tabel",
+        modeAiChart: "📈 AI Cerdas: Analisis Diagram/Grafik",
+        modeAiSummary: "📝 AI Cerdas: Rangkum Dokumen",
+        aiModelLabel: "Model AI",
+        ocrLangLabel: "Bahasa OCR",
+        previewTitle: "Preview (Tab Aktif)",
+        selectTabHint: "Pilih tab di sebelah kanan",
+        resultsTitle: "Hasil Ekstraksi",
+        noFileHint: "Belum ada file. Silakan Paste / Upload dokumen di sebelah kiri.",
+        editablePlaceholder: "Teks, tabel, atau rangkuman hasil scan akan muncul di sini... Anda bebas mengedit.",
+        searchPlaceholder: "Cari di teks...",
+        searchMatch: "cocok",
+        searchMatches: "cocok",
+        words: "kata",
+        chars: "karakter",
+        copyBtn: "Salin",
+        exportBtn: "Export",
+        exportWordBtn: "Export ke Word",
+        exportTxtBtn: "Export ke TXT",
+        exportMdBtn: "Export ke Markdown",
+        // Toasts
+        storageFullToast: "Penyimpanan browser penuh. Hapus tab lama.",
+        processingLockToast: "Tunggu, sistem sedang memproses!",
+        apiKeyRequiredToast: "API Key Gemini wajib diisi untuk Mode AI!",
+        fileTypeError: "Harap masukkan file berupa Gambar atau PDF!",
+        pdfExtractingToast: "Mengekstrak halaman PDF...",
+        pdfDoneToast: n => `Selesai memproses ${n} halaman PDF!`,
+        pdfErrorToast: "Gagal membaca struktur PDF.",
+        tabDeletedToast: "Tab berhasil dihapus",
+        tabProcessingToast: "Sedang diproses, tidak bisa dihapus!",
+        copiedToast: "Teks berhasil disalin!",
+        wordExportToast: "Berhasil diexport ke Word!",
+        txtExportToast: "Berhasil diexport ke TXT!",
+        mdExportToast: "Berhasil diexport ke Markdown!",
+        jsonExportToast: "Backup JSON berhasil diunduh",
+        jsonImportToast: "Data berhasil di-load dari JSON",
+        jsonImportWaitToast: "Tunggu proses selesai sebelum import JSON",
+        jsonFormatError: "Format JSON tidak valid!",
+        jsonReadError: "Gagal membaca file JSON!",
+        noDataExportError: "Tidak ada data untuk di-export",
+        noTextError: "Tidak ada teks untuk diexport",
+        clearAllConfirm: "Hapus semua tab?",
+        aiProcessingToast: model => `✨ Memproses dengan ${model}...`,
+        // Progress
+        preparingEngine: "Menyiapkan Engine...",
+        readingOffline: p => `Membaca Offline: ${p}%`,
+        sendingToAI: model => `Mengirim ke ${model}...`,
+        localEngineReading: "Engine lokal membaca...",
+        aiAnalyzing: "AI sedang menganalisis...",
+        // AI Prompts
+        promptText: "Ekstrak seluruh teks dari gambar ini dengan sangat akurat. Perhatikan strukturnya, jika ada multi-kolom atau blok teks terpisah, baca sesuai urutan alami. JANGAN buat deskripsi gambar, cukup ekstraksi teks murni.",
+        promptTable: "Analisis gambar ini dan ekstrak semua data. Format hasilnya sebagai tabel Markdown (gunakan '|' sebagai pemisah kolom). Susun data secara rapi dan terorganisir.",
+        promptChart: "Analisis diagram, grafik, atau chart secara komprehensif. Ekstrak data utama, jelaskan sumbu X/Y atau legenda, dan berikan ringkasan naratif (insight). Jawab dalam Bahasa Indonesia.",
+        promptSummary: "Rangkum konten utama dari gambar dokumen ini. Ekstrak poin-poin kunci, topik utama, dan detail penting dalam format yang jelas dan terstruktur. Jawab dalam Bahasa Indonesia.",
+    }
+};
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let lang = 'en';
+let documents = [];
+let activeDocId = null;
+let globalProcessingLock = false;
+let zoomLevel = 1;
+let searchMatches = [];
+let searchCurrent = -1;
+
+// ─── DOM REFS ─────────────────────────────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const multiFileInput = document.getElementById('multi-file-input');
+const imagePreview = document.getElementById('image-preview');
+const emptyPreviewState = document.getElementById('empty-preview-state');
+const scanModeSelect = document.getElementById('scan-mode');
+const aiModelContainer = document.getElementById('ai-model-container');
+const ocrLangContainer = document.getElementById('ocr-lang-container');
+const aiModelSelect = document.getElementById('ai-model');
+const ocrLangSelect = document.getElementById('ocr-lang');
+const apiKeyInput = document.getElementById('api-key-input');
+const apiKeyContainer = document.getElementById('api-key-container');
+const tabsContainer = document.getElementById('tabs-container');
+const resultText = document.getElementById('result-text');
+const emptyStateOverlay = document.getElementById('empty-state-overlay');
+const progressContainer = document.getElementById('progress-container');
+const progressText = document.getElementById('progress-text');
+const copyBtn = document.getElementById('copy-btn');
+const exportMainBtn = document.getElementById('export-main-btn');
+const exportMenu = document.getElementById('export-menu');
+const exportWordBtn = document.getElementById('export-word-btn');
+const exportTxtBtn = document.getElementById('export-txt-btn');
+const exportMdBtn = document.getElementById('export-md-btn');
+const exportJsonBtn = document.getElementById('export-json-btn');
+const importJsonBtn = document.getElementById('import-json-btn');
+const jsonInput = document.getElementById('json-input');
+const toast = document.getElementById('toast');
+const toastMessage = document.getElementById('toast-message');
+const toastIconSuccess = document.getElementById('toast-icon-success');
+const toastIconError = document.getElementById('toast-icon-error');
+const wordCountEl = document.getElementById('word-count');
+const charCountEl = document.getElementById('char-count');
+const searchInput = document.getElementById('search-input');
+const searchCount = document.getElementById('search-count');
+const searchPrev = document.getElementById('search-prev');
+const searchNext = document.getElementById('search-next');
+const searchClearBtn = document.getElementById('search-clear');
+const clearAllBtn = document.getElementById('clear-all-btn');
+const activModeBadge = document.getElementById('active-mode-badge');
+
+// ─── I18N ─────────────────────────────────────────────────────────────────────
+function t(key, ...args) {
+    const val = LANGS[lang][key];
+    if (typeof val === 'function') return val(...args);
+    return val ?? key;
+}
+
+function applyLang() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        el.textContent = t(key);
+    });
+    // Select options
+    document.querySelectorAll('[data-i18n-opt]').forEach(opt => {
+        opt.textContent = t(opt.getAttribute('data-i18n-opt'));
+    });
+    // Placeholder
+    apiKeyInput.placeholder = t('apiKeyPlaceholder');
+    resultText.placeholder = t('editablePlaceholder');
+    searchInput.placeholder = t('searchPlaceholder');
+    // Lang buttons
+    document.getElementById('btn-lang-en').classList.toggle('active', lang === 'en');
+    document.getElementById('btn-lang-id').classList.toggle('active', lang === 'id');
+}
+
+function setLang(newLang) {
+    lang = newLang;
+    localStorage.setItem('webocr_lang', lang);
+    applyLang();
+    updateSearchCount();
+    lucide.createIcons();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function loadData() {
+    lang = localStorage.getItem('webocr_lang') || 'en';
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) apiKeyInput.value = savedKey;
+    try {
+        const saved = localStorage.getItem('webocr_data_v2');
+        if (saved) {
+            documents = JSON.parse(saved);
+            documents.forEach(d => d.isProcessing = false);
+            activeDocId = documents.length > 0 ? documents[documents.length-1].id : null;
+        }
+    } catch(e) { documents = []; }
+    applyLang();
+    updateModeVisibility();
+    render();
+    lucide.createIcons();
+}
+
+function saveData() {
+    try {
+        localStorage.setItem('webocr_data_v2', JSON.stringify(documents));
+    } catch(e) {
+        if (e.name === 'QuotaExceededError') showToast(t('storageFullToast'), true);
+    }
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function extractBase64(dataUrl) { return dataUrl.split(',')[1] || ''; }
+function extractMime(dataUrl) {
+    const m = dataUrl.match(/data:([^;]+);/);
+    return m ? m[1] : 'image/jpeg';
+}
+
+function showToast(msg, isError = false) {
+    toastMessage.textContent = msg;
+    toastIconSuccess.classList.toggle('hidden', isError);
+    toastIconError.classList.toggle('hidden', !isError);
+    toast.classList.remove('translate-y-16', 'opacity-0');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+        toast.classList.add('translate-y-16', 'opacity-0');
+    }, 3800);
+}
+
+function updateWordCount() {
+    const text = resultText.value;
+    const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+    wordCountEl.textContent = words;
+    charCountEl.textContent = text.length;
+}
+
+// ─── ZOOM ─────────────────────────────────────────────────────────────────────
+document.getElementById('zoom-in-btn').onclick = () => { zoomLevel = Math.min(zoomLevel + 0.25, 4); applyZoom(); };
+document.getElementById('zoom-out-btn').onclick = () => { zoomLevel = Math.max(zoomLevel - 0.25, 0.5); applyZoom(); };
+document.getElementById('zoom-reset-btn').onclick = () => { zoomLevel = 1; applyZoom(); };
+imagePreview.addEventListener('click', () => {
+    zoomLevel = zoomLevel === 1 ? 2 : 1;
+    applyZoom();
+});
+function applyZoom() {
+    imagePreview.style.transform = `scale(${zoomLevel})`;
+    document.getElementById('zoom-level').textContent = Math.round(zoomLevel * 100) + '%';
+    imagePreview.style.cursor = zoomLevel > 1 ? 'zoom-out' : 'zoom-in';
+}
+
+// ─── SEARCH ───────────────────────────────────────────────────────────────────
+function doSearch() {
+    const query = searchInput.value.trim();
+    if (!query) {
+        searchMatches = [];
+        searchCurrent = -1;
+        searchCount.classList.add('hidden');
+        searchClearBtn.classList.add('hidden');
+        searchPrev.disabled = true;
+        searchNext.disabled = true;
+        return;
+    }
+    searchClearBtn.classList.remove('hidden');
+    const text = resultText.value;
+    const lower = text.toLowerCase();
+    const q = query.toLowerCase();
+    searchMatches = [];
+    let idx = 0;
+    while ((idx = lower.indexOf(q, idx)) !== -1) {
+        searchMatches.push(idx);
+        idx += q.length;
+    }
+    searchCurrent = searchMatches.length > 0 ? 0 : -1;
+    updateSearchCount();
+    highlightCurrent();
+}
+
+function updateSearchCount() {
+    if (!searchInput.value.trim()) return;
+    const n = searchMatches.length;
+    if (n === 0) {
+        searchCount.textContent = '0';
+        searchCount.classList.remove('hidden');
+    } else {
+        const label = n === 1 ? t('searchMatch') : t('searchMatches');
+        searchCount.textContent = `${searchCurrent + 1}/${n} ${label}`;
+        searchCount.classList.remove('hidden');
+    }
+    searchPrev.disabled = n === 0;
+    searchNext.disabled = n === 0;
+}
+
+function highlightCurrent() {
+    if (searchCurrent < 0 || searchMatches.length === 0) return;
+    const start = searchMatches[searchCurrent];
+    const end = start + searchInput.value.length;
+    resultText.focus();
+    resultText.setSelectionRange(start, end);
+    // Scroll into view
+    const lineHeight = 20;
+    const lines = resultText.value.substring(0, start).split('\n').length;
+    resultText.scrollTop = (lines - 3) * lineHeight;
+}
+
+searchInput.addEventListener('input', doSearch);
+searchPrev.addEventListener('click', () => {
+    if (searchMatches.length === 0) return;
+    searchCurrent = (searchCurrent - 1 + searchMatches.length) % searchMatches.length;
+    updateSearchCount();
+    highlightCurrent();
+});
+searchNext.addEventListener('click', () => {
+    if (searchMatches.length === 0) return;
+    searchCurrent = (searchCurrent + 1) % searchMatches.length;
+    updateSearchCount();
+    highlightCurrent();
+});
+searchClearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    doSearch();
+});
+
+// ─── LANG & MODE CONTROLS ─────────────────────────────────────────────────────
+apiKeyInput.addEventListener('input', e => localStorage.setItem('gemini_api_key', e.target.value));
+
+document.getElementById('toggle-key-btn').addEventListener('click', () => {
+    const isPass = apiKeyInput.type === 'password';
+    apiKeyInput.type = isPass ? 'text' : 'password';
+    document.getElementById('toggle-key-icon').setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
+    lucide.createIcons();
+});
+
+scanModeSelect.addEventListener('change', updateModeVisibility);
+function updateModeVisibility() {
+    const isAI = scanModeSelect.value !== 'offline';
+    aiModelContainer.classList.toggle('hidden', !isAI);
+    ocrLangContainer.classList.toggle('hidden', isAI);
+}
+
+function validateApiKey() {
+    if (scanModeSelect.value !== 'offline' && !apiKeyInput.value.trim()) {
+        apiKeyContainer.classList.add('ring-2', 'ring-red-400', 'animate-shake', 'border-red-400');
+        apiKeyInput.focus();
+        setTimeout(() => apiKeyContainer.classList.remove('ring-2','ring-red-400','animate-shake','border-red-400'), 1000);
+        showToast(t('apiKeyRequiredToast'), true);
+        return false;
+    }
+    return true;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+    renderTabs();
+    renderActiveContent();
+    saveData();
+    lucide.createIcons();
+}
+
+function renderTabs() {
+    tabsContainer.innerHTML = '';
+    documents.forEach((doc, i) => {
+        const isActive = doc.id === activeDocId;
+        const tab = document.createElement('div');
+        tab.className = `tab-item ${isActive ? 'active' : ''} mb-0`;
+        tab.onclick = () => { activeDocId = doc.id; zoomLevel = 1; applyZoom(); render(); };
+
+        const label = document.createElement('span');
+        label.className = 'truncate max-w-[90px] text-xs';
+        label.textContent = doc.title || `File ${i+1}`;
+        tab.appendChild(label);
+
+        if (doc.isProcessing) {
+            const spin = document.createElement('span');
+            spin.innerHTML = '<span class="pulse-dot w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>';
+            tab.appendChild(spin);
+        }
+
+        const close = document.createElement('button');
+        close.className = 'w-4 h-4 rounded flex items-center justify-center text-current opacity-50 hover:opacity-100 hover:bg-red-100 hover:text-red-500 transition-all ml-0.5 shrink-0';
+        close.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
+        close.onclick = e => {
+            e.stopPropagation();
+            if (doc.isProcessing) { showToast(t('tabProcessingToast'), true); return; }
+            deleteDoc(doc.id);
+        };
+        tab.appendChild(close);
+        tabsContainer.appendChild(tab);
+    });
+}
+
+function renderActiveContent() {
+    const doc = documents.find(d => d.id === activeDocId);
+
+    if (!doc) {
+        imagePreview.classList.add('hidden');
+        emptyPreviewState.classList.remove('hidden');
+        resultText.value = '';
+        resultText.disabled = true;
+        emptyStateOverlay.classList.remove('hidden');
+        copyBtn.disabled = true;
+        exportMainBtn.disabled = true;
+        progressContainer.classList.add('hidden');
+        resultText.classList.remove('font-mono-table');
+        activModeBadge.classList.add('hidden');
+        updateWordCount();
+        return;
+    }
+
+    // Preview
+    imagePreview.src = doc.image;
+    imagePreview.classList.remove('hidden');
+    emptyPreviewState.classList.add('hidden');
+
+    // Mode badge
+    activModeBadge.classList.remove('hidden', 'mode-offline', 'mode-ai');
+    if (doc.mode === 'offline') {
+        activModeBadge.textContent = 'OFFLINE OCR';
+        activModeBadge.classList.add('mode-offline');
+    } else {
+        const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-summary':'AI SUMMARY' };
+        activModeBadge.textContent = modeLabels[doc.mode] || 'AI';
+        activModeBadge.classList.add('mode-ai');
+    }
+
+    resultText.classList.toggle('font-mono-table', doc.mode === 'ai-table');
+    resultText.value = doc.text;
+    resultText.disabled = doc.isProcessing;
+    updateWordCount();
+
+    if (doc.isProcessing) {
+        emptyStateOverlay.classList.add('hidden');
+        copyBtn.disabled = true;
+        exportMainBtn.disabled = true;
+        progressContainer.classList.remove('hidden');
+        progressContainer.classList.add('flex');
+        progressText.textContent = doc.mode === 'offline' ? t('localEngineReading') : t('aiAnalyzing');
+    } else {
+        emptyStateOverlay.classList.add('hidden');
+        const hasText = doc.text.trim() !== '';
+        copyBtn.disabled = !hasText;
+        exportMainBtn.disabled = !hasText;
+        progressContainer.classList.add('hidden');
+        progressContainer.classList.remove('flex');
+    }
+}
+
+function deleteDoc(id) {
+    documents = documents.filter(d => d.id !== id);
+    if (activeDocId === id) activeDocId = documents.length > 0 ? documents[documents.length-1].id : null;
+    render();
+    showToast(t('tabDeletedToast'));
+}
+
+// ─── CLEAR ALL ────────────────────────────────────────────────────────────────
+clearAllBtn.addEventListener('click', () => {
+    if (documents.length === 0) return;
+    if (!confirm(t('clearAllConfirm'))) return;
+    documents = [];
+    activeDocId = null;
+    render();
+});
+
+// ─── FILE HANDLING ────────────────────────────────────────────────────────────
+function handleFile(file) {
+    if (!file) return;
+    if (!validateApiKey()) return;
+    if (file.type === 'application/pdf') { processPDF(file); return; }
+    if (!file.type.startsWith('image/')) { showToast(t('fileTypeError'), true); return; }
+    loadImageFile(file);
+}
+
+function handleMultipleFiles(files) {
+    const arr = Array.from(files);
+    if (!validateApiKey()) return;
+    arr.forEach((f, i) => setTimeout(() => handleFile(f), i * 80));
+}
+
+function loadImageFile(file) {
+    if (globalProcessingLock) { showToast(t('processingLockToast'), true); return; }
+    const mode = scanModeSelect.value;
+    const model = aiModelSelect.value;
+    globalProcessingLock = true;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const doc = { id: Date.now().toString(), image: e.target.result, text: '', isProcessing: true, title: file.name.split('.')[0].slice(0, 16) || `File ${documents.length+1}`, mode };
+        documents.push(doc);
+        activeDocId = doc.id;
+        render();
+        startOCR(doc.id, e.target.result, mode, model).finally(() => { globalProcessingLock = false; });
+    };
+    reader.readAsDataURL(file);
+}
+
+async function processPDF(file) {
+    if (globalProcessingLock) { showToast(t('processingLockToast'), true); return; }
+    globalProcessingLock = true;
+    const mode = scanModeSelect.value;
+    const model = aiModelSelect.value;
+    showToast(t('pdfExtractingToast'));
+    try {
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const pages = Math.min(pdf.numPages, 20);
+        for (let i = 1; i <= pages; i++) {
+            const page = await pdf.getPage(i);
+            const vp = page.getViewport({ scale: 1.8 });
+            const canvas = document.createElement('canvas');
+            canvas.width = vp.width; canvas.height = vp.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+            const imgUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const docId = `${Date.now()}-p${i}`;
+            const doc = { id: docId, image: imgUrl, text: '', isProcessing: true, title: `PDF p.${i}`, mode };
+            documents.push(doc);
+            activeDocId = docId;
             render();
-            updateModelVisibility();
+            await startOCR(docId, imgUrl, mode, model);
         }
+        showToast(t('pdfDoneToast', pages));
+    } catch(e) {
+        console.error(e);
+        showToast(t('pdfErrorToast'), true);
+    } finally {
+        globalProcessingLock = false;
+        render();
+    }
+}
 
-        // Auto-save State ke LocalStorage
-        function saveData() {
-            try {
-                localStorage.setItem('webocr_data', JSON.stringify(documents));
-            } catch (e) {
-                if (e.name === 'QuotaExceededError') {
-                    showToast("Penyimpanan browser penuh. Hapus tab lama.", true);
-                }
-            }
-        }
-
-        // --- BYOK (API KEY) LOGIC ---
-        apiKeyInput.addEventListener('input', (e) => {
-            localStorage.setItem('gemini_api_key', e.target.value);
-        });
-
-        toggleKeyBtn.addEventListener('click', () => {
-            if (apiKeyInput.type === 'password') {
-                apiKeyInput.type = 'text';
-                toggleKeyIcon.setAttribute('data-lucide', 'eye-off');
-            } else {
-                apiKeyInput.type = 'password';
-                toggleKeyIcon.setAttribute('data-lucide', 'eye');
-            }
-            lucide.createIcons();
-        });
-
-        // Validasi API Key
-        function validateApiKeyForAI() {
-            const currentMode = scanModeSelect.value;
-            if (currentMode !== 'offline' && !apiKeyInput.value.trim()) {
-                // Beri efek shake dan warna merah pada kotak API key
-                apiKeyContainer.classList.add('ring-2', 'ring-red-500', 'animate-shake', 'border-red-500');
-                apiKeyInput.focus();
-                
-                setTimeout(() => {
-                    apiKeyContainer.classList.remove('ring-2', 'ring-red-500', 'animate-shake', 'border-red-500');
-                }, 1000);
-
-                showToast("API Key Google Gemini wajib diisi untuk menggunakan Mode AI!", true);
-                return false;
-            }
-            return true;
-        }
-
-        // Toggle dropdown model jika mode AI dipilih
-        scanModeSelect.addEventListener('change', updateModelVisibility);
-        function updateModelVisibility() {
-            if (scanModeSelect.value === 'offline') {
-                aiModelContainer.classList.add('hidden');
-            } else {
-                aiModelContainer.classList.remove('hidden');
-            }
-        }
-
-        // --- HELPER FUNGSI ---
-        function extractBase64Data(dataUrl) {
-            const parts = dataUrl.split(',');
-            return parts.length > 1 ? parts[1] : '';
-        }
-
-        function extractMimeType(dataUrl) {
-            const match = dataUrl.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/);
-            return match ? match[1] : 'image/jpeg';
-        }
-
-        // --- GEMINI AI INTEGRATION API ---
-        async function fetchGeminiWithRetry(prompt, base64Image, mimeType, apiKey, modelName) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            
-            const payload = {
-                contents: [{
-                    role: "user",
-                    parts: [
-                        { text: prompt },
-                        { inlineData: { mimeType: mimeType, data: base64Image } }
-                    ]
-                }]
-            };
-
-            const delays = [1000, 2000, 4000, 8000, 16000];
-            for (let i = 0; i < delays.length + 1; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    
-                    if (!response.ok) {
-                        const errBody = await response.text();
-                        throw new Error(`Error API (${response.status}): Cek API Key Anda. ${errBody}`);
+// ─── OCR ENGINE ───────────────────────────────────────────────────────────────
+async function startOCR(docId, imgUrl, mode, modelName) {
+    try {
+        let text = '';
+        if (mode === 'offline') {
+            const ocrLang = ocrLangSelect.value;
+            const result = await Tesseract.recognize(imgUrl, ocrLang, {
+                logger: m => {
+                    if (activeDocId === docId && m.status === 'recognizing text') {
+                        const p = Math.round(m.progress * 100);
+                        progressText.textContent = t('readingOffline', p);
+                    } else if (activeDocId === docId) {
+                        progressText.textContent = t('preparingEngine');
                     }
-                    
-                    const result = await response.json();
-                    return result.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, AI gagal menghasilkan teks.";
-                } catch (error) {
-                    console.error(`Attempt ${i+1} failed:`, error);
-                    if (i === delays.length) throw error;
-                    await new Promise(res => setTimeout(res, delays[i]));
                 }
-            }
-        }
-
-        // --- RENDER UI ---
-        function render() {
-            renderTabs();
-            renderActiveContent();
-            saveData(); 
-        }
-
-        function renderTabs() {
-            tabsContainer.innerHTML = '';
-            
-            documents.forEach((doc, index) => {
-                const isActive = doc.id === activeDocId;
-                const tab = document.createElement('div');
-                
-                tab.className = `flex items-center gap-2 px-4 py-2 rounded-t-lg border-t border-l border-r cursor-pointer text-sm font-medium transition-colors select-none ${
-                    isActive ? 'bg-white border-gray-200 text-indigo-600 shadow-[0_4px_0_0_#fff]' : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200 mt-1'
-                }`;
-                if(isActive) tab.style.zIndex = '1';
-                
-                tab.onclick = () => {
-                    activeDocId = doc.id;
-                    render();
-                };
-
-                const title = document.createElement('span');
-                title.textContent = doc.title || `File ${index + 1}`;
-                title.className = "whitespace-nowrap max-w-[100px] truncate";
-
-                if (doc.isProcessing) {
-                    const spinner = document.createElement('div');
-                    spinner.className = "loader ml-1";
-                    spinner.style.cssText = "width: 12px; height: 12px; border-width: 2px; border-top-color: #4f46e5;";
-                    title.appendChild(spinner);
-                }
-
-                const closeBtn = document.createElement('span');
-                closeBtn.innerHTML = '<i data-lucide="x" class="w-3.5 h-3.5 hover:text-red-500 transition-colors"></i>';
-                closeBtn.className = "ml-1 opacity-60 hover:opacity-100 p-0.5 rounded hover:bg-red-50";
-                closeBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if(doc.isProcessing) {
-                        showToast("Sedang diproses, tidak bisa dihapus!", true);
-                        return;
-                    }
-                    deleteDoc(doc.id);
-                };
-
-                tab.appendChild(title);
-                tab.appendChild(closeBtn);
-                tabsContainer.appendChild(tab);
             });
-            lucide.createIcons();
+            text = result.data.text;
+        } else {
+            const modelLabel = aiModelSelect.options[aiModelSelect.selectedIndex]?.text || modelName;
+            showToast(t('aiProcessingToast', modelLabel));
+            if (activeDocId === docId) progressText.textContent = t('sendingToAI', modelLabel);
+
+            const prompts = {
+                'ai-text': t('promptText'),
+                'ai-table': t('promptTable'),
+                'ai-chart': t('promptChart'),
+                'ai-summary': t('promptSummary'),
+            };
+            text = await callGemini(prompts[mode] || t('promptText'), extractBase64(imgUrl), extractMime(imgUrl), apiKeyInput.value.trim(), modelName);
         }
 
-        function renderActiveContent() {
-            const activeDoc = documents.find(d => d.id === activeDocId);
+        const doc = documents.find(d => d.id === docId);
+        if (doc) { doc.text = text; doc.isProcessing = false; render(); }
+    } catch(e) {
+        console.error(e);
+        const doc = documents.find(d => d.id === docId);
+        if (doc) { doc.text = e.message || 'Processing error.'; doc.isProcessing = false; render(); }
+        showToast(e.message, true);
+    }
+}
 
-            if (!activeDoc) {
-                imagePreview.classList.add('hidden');
-                emptyPreviewState.classList.remove('hidden');
-                resultText.value = '';
-                resultText.disabled = true;
-                emptyStateOverlay.classList.remove('hidden');
-                copyBtn.disabled = true;
-                exportBtn.disabled = true;
-                progressContainer.classList.add('hidden');
-                progressContainer.classList.remove('flex');
-                resultText.classList.remove('font-mono-table');
-                return;
-            }
-
-            imagePreview.src = activeDoc.image;
-            imagePreview.classList.remove('hidden');
-            emptyPreviewState.classList.add('hidden');
-
-            if (activeDoc.mode === 'ai-table') {
-                resultText.classList.add('font-mono-table');
-            } else {
-                resultText.classList.remove('font-mono-table');
-            }
-
-            resultText.value = activeDoc.text;
-            resultText.disabled = activeDoc.isProcessing;
-            
-            if (activeDoc.isProcessing) {
-                emptyStateOverlay.classList.add('hidden');
-                copyBtn.disabled = true;
-                exportBtn.disabled = true;
-                progressContainer.classList.remove('hidden');
-                progressContainer.classList.add('flex');
-                progressText.textContent = activeDoc.mode === 'offline' ? "Engine lokal membaca..." : "AI sedang menganalisis...";
-            } else {
-                emptyStateOverlay.classList.add('hidden');
-                const hasText = activeDoc.text.trim() !== "";
-                copyBtn.disabled = !hasText;
-                exportBtn.disabled = !hasText;
-                progressContainer.classList.add('hidden');
-                progressContainer.classList.remove('flex');
-            }
+async function callGemini(prompt, base64, mime, apiKey, model) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const body = { contents: [{ role:'user', parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: base64 } }] }] };
+    const delays = [1000, 2000, 4000, 8000];
+    for (let i = 0; i <= delays.length; i++) {
+        const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        if (res.ok) {
+            const data = await res.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No output from AI.';
         }
+        if (i === delays.length) {
+            const err = await res.text().catch(() => res.statusText);
+            throw new Error(`API Error (${res.status}): ${err}`);
+        }
+        await new Promise(r => setTimeout(r, delays[i]));
+    }
+}
 
-        function deleteDoc(id) {
-            documents = documents.filter(d => d.id !== id);
-            if (activeDocId === id) {
-                activeDocId = documents.length > 0 ? documents[documents.length - 1].id : null;
-            }
+// ─── TEXT EDITING ─────────────────────────────────────────────────────────────
+resultText.addEventListener('input', e => {
+    if (!activeDocId) return;
+    const doc = documents.find(d => d.id === activeDocId);
+    if (doc) {
+        doc.text = e.target.value;
+        saveData();
+        const has = doc.text.trim() !== '';
+        copyBtn.disabled = !has;
+        exportMainBtn.disabled = !has;
+        updateWordCount();
+        if (searchInput.value) doSearch();
+    }
+});
+
+// ─── EXPORT DROPDOWN ──────────────────────────────────────────────────────────
+exportMainBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    exportMenu.classList.toggle('open');
+});
+document.addEventListener('click', () => exportMenu.classList.remove('open'));
+
+exportWordBtn.addEventListener('click', () => {
+    exportMenu.classList.remove('open');
+    const text = resultText.value;
+    if (!text) { showToast(t('noTextError'), true); return; }
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><style>body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.6;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #000;padding:6px;}th{background:#f2f2f2;}</style></head><body>${marked.parse(text)}</body></html>`;
+    triggerDownload(new Blob(['\ufeff', html], {type:'application/msword'}), `WebOCR_${Date.now()}.doc`);
+    showToast(t('wordExportToast'));
+});
+
+exportTxtBtn.addEventListener('click', () => {
+    exportMenu.classList.remove('open');
+    const text = resultText.value;
+    if (!text) { showToast(t('noTextError'), true); return; }
+    triggerDownload(new Blob([text], {type:'text/plain;charset=utf-8'}), `WebOCR_${Date.now()}.txt`);
+    showToast(t('txtExportToast'));
+});
+
+exportMdBtn.addEventListener('click', () => {
+    exportMenu.classList.remove('open');
+    const text = resultText.value;
+    if (!text) { showToast(t('noTextError'), true); return; }
+    triggerDownload(new Blob([text], {type:'text/markdown;charset=utf-8'}), `WebOCR_${Date.now()}.md`);
+    showToast(t('mdExportToast'));
+});
+
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ─── COPY ─────────────────────────────────────────────────────────────────────
+copyBtn.addEventListener('click', () => {
+    if (!resultText.value) return;
+    navigator.clipboard.writeText(resultText.value)
+        .then(() => showToast(t('copiedToast')))
+        .catch(() => { resultText.select(); document.execCommand('copy'); showToast(t('copiedToast')); });
+});
+
+// ─── JSON IMPORT/EXPORT ───────────────────────────────────────────────────────
+exportJsonBtn.addEventListener('click', () => {
+    if (!documents.length) { showToast(t('noDataExportError'), true); return; }
+    triggerDownload(new Blob([JSON.stringify(documents)], {type:'application/json'}), `WebOCR_Backup_${Date.now()}.json`);
+    showToast(t('jsonExportToast'));
+});
+importJsonBtn.addEventListener('click', () => {
+    if (globalProcessingLock) { showToast(t('jsonImportWaitToast'), true); return; }
+    jsonInput.click();
+});
+jsonInput.addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            if (!Array.isArray(data)) { showToast(t('jsonFormatError'), true); return; }
+            documents = data;
+            documents.forEach(d => d.isProcessing = false);
+            activeDocId = documents.length > 0 ? documents[documents.length-1].id : null;
             render();
-            showToast("Tab berhasil dihapus");
-        }
+            showToast(t('jsonImportToast'));
+        } catch { showToast(t('jsonReadError'), true); }
+        jsonInput.value = '';
+    };
+    reader.readAsText(file);
+});
 
-        function showToast(message, isError = false) {
-            toastMessage.textContent = message;
-            if (isError) {
-                toastIconSuccess.classList.add('hidden');
-                toastIconError.classList.remove('hidden');
-            } else {
-                toastIconSuccess.classList.remove('hidden');
-                toastIconError.classList.add('hidden');
-            }
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 4000);
-        }
+// ─── DROP / PASTE / FILE EVENTS ───────────────────────────────────────────────
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); fileInput.value = ''; });
+multiFileInput.addEventListener('change', e => { if (e.target.files.length) handleMultipleFiles(e.target.files); multiFileInput.value = ''; });
 
-        // --- FILE HANDLING ---
-        function handleFile(file) {
-            if (globalProcessingLock) {
-                showToast("Tunggu, sistem sedang memproses antrian!", true);
-                return;
-            }
-            
-            // Validasi API Key Sebelum Mulai Load File
-            if (!validateApiKeyForAI()) return;
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drop-active'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drop-active'));
+dropzone.addEventListener('drop', e => {
+    e.preventDefault(); dropzone.classList.remove('drop-active');
+    if (e.dataTransfer.files.length > 1) handleMultipleFiles(e.dataTransfer.files);
+    else if (e.dataTransfer.files.length === 1) handleFile(e.dataTransfer.files[0]);
+});
 
-            if (!file) return;
+window.addEventListener('paste', e => {
+    const items = e.clipboardData?.items || [];
+    for (const item of items) {
+        if (item.type.startsWith('image/')) { handleFile(item.getAsFile()); break; }
+    }
+});
 
-            if (file.type === 'application/pdf') {
-                processPDF(file);
-                return;
-            }
-
-            if (!file.type.startsWith('image/')) {
-                showToast("Harap masukkan file berupa Gambar atau PDF!", true);
-                return;
-            }
-
-            const currentMode = scanModeSelect.value;
-            const currentModel = aiModelSelect.value;
-            
-            globalProcessingLock = true;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const newDoc = {
-                    id: Date.now().toString(),
-                    image: e.target.result,
-                    text: "",
-                    isProcessing: true,
-                    title: `Gambar ${documents.length + 1}`,
-                    mode: currentMode
-                };
-                documents.push(newDoc);
-                activeDocId = newDoc.id;
-                render();
-                
-                startOCR(newDoc.id, e.target.result, currentMode, currentModel).finally(() => {
-                    globalProcessingLock = false;
-                });
-            };
-            reader.readAsDataURL(file);
-        }
-
-        async function processPDF(file) {
-            if (!validateApiKeyForAI()) return;
-
-            globalProcessingLock = true;
-            const currentMode = scanModeSelect.value;
-            const currentModel = aiModelSelect.value;
-
-            showToast("Mengekstrak halaman PDF...", false);
-            
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                const totalPages = pdf.numPages;
-                const pagesToProcess = Math.min(totalPages, 20); 
-                
-                for (let i = 1; i <= pagesToProcess; i++) {
-                    const page = await pdf.getPage(i);
-                    const viewport = page.getViewport({ scale: 1.5 }); 
-                    
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    const newDocId = Date.now().toString() + '-' + i;
-                    const newDoc = {
-                        id: newDocId,
-                        image: imageDataUrl,
-                        text: "",
-                        isProcessing: true,
-                        title: `Hal PDF ${i}`,
-                        mode: currentMode
-                    };
-                    
-                    documents.push(newDoc);
-                    activeDocId = newDocId;
-                    render();
-
-                    await startOCR(newDocId, imageDataUrl, currentMode, currentModel);
-                }
-                
-                showToast(`Selesai memproses ${pagesToProcess} halaman PDF!`);
-            } catch (error) {
-                console.error("Error reading PDF:", error);
-                showToast("Gagal membaca struktur PDF.", true);
-            } finally {
-                globalProcessingLock = false;
-                render();
-            }
-        }
-
-        resultText.addEventListener('input', (e) => {
-            if(activeDocId) {
-                const doc = documents.find(d => d.id === activeDocId);
-                if(doc) {
-                    doc.text = e.target.value;
-                    saveData();
-                    const hasText = doc.text.trim() !== "";
-                    copyBtn.disabled = !hasText;
-                    exportBtn.disabled = !hasText;
-                }
-            }
-        });
-
-        // ENGINE PEMINDAIAN
-        async function startOCR(docId, imageDataUrl, mode, modelName) {
-            try {
-                let finalExtractedText = "";
-
-                if (mode === 'offline') {
-                    // Gunakan Tesseract.js Tradisional
-                    const result = await Tesseract.recognize(
-                        imageDataUrl,
-                        'ind+eng',
-                        {
-                            logger: m => {
-                                if (activeDocId === docId && progressText && mode === 'offline') {
-                                    if (m.status === 'recognizing text') {
-                                        const progress = Math.round(m.progress * 100);
-                                        progressText.textContent = `Membaca Teks Offline: ${progress}%`;
-                                    } else {
-                                        progressText.textContent = "Menyiapkan Engine...";
-                                    }
-                                }
-                            }
-                        }
-                    );
-                    finalExtractedText = result.data.text;
-                } 
-                else {
-                    // Tampilkan Notifikasi AI yang Sedang Bekerja
-                    const modelLabel = aiModelSelect.options[aiModelSelect.selectedIndex].text;
-                    showToast(`✨ Memproses dengan ${modelLabel}...`);
-                    
-                    if (activeDocId === docId && progressText) {
-                        progressText.textContent = `Mengirim ke ${modelLabel}...`;
-                    }
-                    
-                    const base64Data = extractBase64Data(imageDataUrl);
-                    const mimeType = extractMimeType(imageDataUrl);
-                    const apiKey = apiKeyInput.value.trim();
-                    
-                    let promptInstruction = "";
-                    if (mode === 'ai-text') {
-                        promptInstruction = "Ekstrak seluruh teks dari gambar ini dengan sangat akurat. Perhatikan dan pahami strukturnya, jika ada multi-kolom atau blok teks terpisah, baca sesuai urutan baca alami manusia. JANGAN buat deskripsi tentang gambarnya, cukup berikan murni ekstraksi teksnya saja.";
-                    } else if (mode === 'ai-table') {
-                        promptInstruction = "Analisis gambar ini dengan teliti dan ekstrak semua data yang ada. Format hasilnya secara ketat sebagai tabel Markdown (gunakan simbol pipa '|' sebagai pemisah kolom). Jika gambar ini tidak terlihat seperti tabel yang rapi, tetap usahakan menyusun datanya dengan struktur yang rapi dan terorganisir.";
-                    } else if (mode === 'ai-chart') {
-                        promptInstruction = "Analisis diagram, grafik, atau chart pada gambar ini secara komprehensif. Ekstrak titik-titik data utamanya. Jelaskan apa arti sumbu X/Y atau legendanya. Lalu, berikan ringkasan naratif (insight) tentang apa yang ingin disampaikan oleh grafik ini. Jawab dalam Bahasa Indonesia.";
-                    }
-
-                    finalExtractedText = await fetchGeminiWithRetry(promptInstruction, base64Data, mimeType, apiKey, modelName);
-                }
-
-                // Simpan hasil ke state
-                const doc = documents.find(d => d.id === docId);
-                if(doc) {
-                    doc.text = finalExtractedText;
-                    doc.isProcessing = false;
-                    render();
-                }
-
-            } catch (error) {
-                console.error("Kesalahan Scan:", error);
-                const doc = documents.find(d => d.id === docId);
-                if(doc) {
-                    doc.text = error.message || "Terjadi kesalahan sistem saat memproses gambar ini.";
-                    doc.isProcessing = false;
-                    render();
-                }
-                showToast(error.message, true);
-            }
-        }
-
-        // --- JSON IMPORT & EXPORT ---
-        exportJsonBtn.addEventListener('click', () => {
-            if(documents.length === 0) {
-                showToast("Tidak ada data untuk di-export", true);
-                return;
-            }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(documents));
-            const a = document.createElement('a');
-            a.setAttribute("href", dataStr);
-            a.setAttribute("download", `WebOCR_Backup_${new Date().getTime()}.json`);
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            showToast("Backup JSON berhasil diunduh");
-        });
-
-        importJsonBtn.addEventListener('click', () => {
-            if(globalProcessingLock) {
-                showToast("Tunggu proses selesai sebelum meload JSON", true);
-                return;
-            }
-            jsonInput.click();
-        });
-
-        jsonInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if(!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const importedData = JSON.parse(event.target.result);
-                    if(Array.isArray(importedData)) {
-                        documents = importedData;
-                        documents.forEach(d => d.isProcessing = false);
-                        activeDocId = documents.length > 0 ? documents[documents.length - 1].id : null;
-                        render();
-                        showToast("Data berhasil di-load dari JSON");
-                    } else {
-                        showToast("Format JSON tidak valid!", true);
-                    }
-                } catch(err) {
-                    showToast("Gagal membaca file JSON!", true);
-                }
-                jsonInput.value = ""; 
-            };
-            reader.readAsText(file);
-        });
-
-        // --- EVENT LISTENERS TAMBAHAN ---
-        dropzone.addEventListener('click', (e) => {
-            if(e.target !== fileInput && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {
-                dropzone.focus();
-            }
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            if(e.target.files.length > 0) handleFile(e.target.files[0]);
-        });
-
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            if(!globalProcessingLock) dropzone.classList.add('border-indigo-500', 'bg-indigo-50');
-        });
-        dropzone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropzone.classList.remove('border-indigo-500', 'bg-indigo-50');
-        });
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.classList.remove('border-indigo-500', 'bg-indigo-50');
-            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
-        });
-
-        window.addEventListener('paste', (e) => {
-            const items = e.clipboardData.items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf("image") !== -1) {
-                    const blob = items[i].getAsFile();
-                    handleFile(blob);
-                    break;
-                }
-            }
-        });
-
-        copyBtn.addEventListener('click', () => {
-            if(!resultText.value) return;
-            navigator.clipboard.writeText(resultText.value).then(() => {
-                showToast("Hasil berhasil disalin!");
-            }).catch(() => {
-                resultText.select();
-                document.execCommand('copy');
-                showToast("Hasil berhasil disalin!");
-            });
-        });
-
-        exportBtn.addEventListener('click', () => {
-            const text = resultText.value;
-            if(!text) return;
-
-            // PARSING MARKDOWN KE HTML AGAR RAPI DI WORD
-            // Menggunakan fungsi bawaan dari pustaka Marked.js
-            const htmlBody = marked.parse(text);
-
-            const htmlContent = `
-                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                <head>
-                    <meta charset='utf-8'>
-                    <title>Export Teks OCR</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; }
-                        h1, h2, h3, h4 { color: #333; margin-top: 1em; margin-bottom: 0.5em; }
-                        table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-                        th, td { border: 1px solid #000; padding: 8px; text-align: left; vertical-align: top; }
-                        th { background-color: #f2f2f2; font-weight: bold; }
-                        p { margin-bottom: 1em; }
-                        strong { font-weight: bold; }
-                        em { font-style: italic; }
-                    </style>
-                </head>
-                <body>
-                    ${htmlBody}
-                </body>
-                </html>
-            `;
-
-            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Dokumen_AI_${new Date().getTime()}.doc`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            showToast("Berhasil diexport ke Word dengan format Markdown HTML!");
-        });
-
-        // Initialize
-        loadData();
-
-    </script>
+// ─── START ────────────────────────────────────────────────────────────────────
+loadData();
+</script>
 </body>
 </html>
