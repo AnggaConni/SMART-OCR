@@ -306,10 +306,10 @@
 <main class="flex-grow flex flex-col lg:flex-row gap-4 p-4 overflow-hidden">
 
     <!-- LEFT: Input -->
-    <section class="w-full lg:w-80 xl:w-96 flex flex-col gap-3 shrink-0 overflow-y-auto">
+    <section class="w-full lg:w-80 xl:w-96 flex flex-col gap-3 shrink-0 overflow-y-auto pb-6">
 
         <!-- Upload Zone -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden shrink-0">
             <div class="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center gap-2">
                 <i data-lucide="image-plus" class="w-4 h-4 text-indigo-500"></i>
                 <span class="font-semibold text-gray-700 text-sm" data-i18n="inputAreaTitle">Document Input</span>
@@ -343,7 +343,7 @@
         </div>
 
         <!-- Mode + Model -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden shrink-0">
             <div class="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 flex items-center gap-2">
                 <i data-lucide="sparkles" class="w-4 h-4 text-indigo-500"></i>
                 <span class="font-semibold text-gray-700 text-sm" data-i18n="scanModeLabel">Scan Mode</span>
@@ -364,9 +364,9 @@
                     </label>
 
                     <select id="ai-model" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
-                        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Terbaru)</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Stable)</option>
-                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (High Accuracy)</option>
+                        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Cepat & Stabil)</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Akurasi Tinggi)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Versi Sebelumnya)</option>
                     </select>
 
                 </div>
@@ -393,7 +393,7 @@
         </div>
 
         <!-- Image Preview -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden flex-grow min-h-[180px]">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden shrink-0 min-h-[350px]">
             <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between shrink-0">
                 <span class="font-semibold text-gray-700 text-sm flex items-center gap-2">
                     <i data-lucide="image" class="w-4 h-4"></i>
