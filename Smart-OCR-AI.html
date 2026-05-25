@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Teks Pintar (OCR)</title>
+    <!-- Tailwind CSS untuk Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tesseract.js untuk Engine OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- PDF.js untuk membaca file PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Marked.js untuk render Markdown ke HTML (Word Export) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .drop-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Font monospace untuk tabel agar rapi */
+        .font-mono-table { font-family: 'Courier New', Courier, monospace; }
+        
+        /* Shake animation untuk API Key kosong */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out 2; }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm shrink-0 flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white">
+                <i data-lucide="scan-text"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-900 leading-tight">WebOCR Pro + AI</h1>
+                <p class="text-xs text-gray-500">Ekstrak Teks, Tabel, & Analisis Diagram secara Pintar</p>
+            </div>
+        </div>
+        
+        <!-- Controls & BYOK -->
+        <div class="flex items-center gap-3">
+            <!-- BYOK Input Area -->
+            <div id="api-key-container" class="flex items-center gap-2 bg-gray-50 border border-gray-300 px-3 py-2 rounded-lg focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all duration-300">
+                <i data-lucide="key" class="w-4 h-4 text-gray-500"></i>
+                <input type="password" id="api-key-input" placeholder="Masukkan Gemini API Key..." class="bg-transparent border-none outline-none text-sm w-48 text-gray-700 placeholder-gray-400" autocomplete="off">
+                <button id="toggle-key-btn" class="text-gray-400 hover:text-indigo-600 transition-colors focus:outline-none" title="Lihat/Sembunyikan Key">
+                    <i data-lucide="eye" class="w-4 h-4" id="toggle-key-icon"></i>
+                </button>
+            </div>
+
+            <!-- JSON Data Buttons -->
+            <button id="import-json-btn" class="hidden md:flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors" title="Load JSON">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+            </button>
+            <button id="export-json-btn" class="hidden md:flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors" title="Save JSON">
+                <i data-lucide="download" class="w-4 h-4"></i>
+            </button>
+            <input type="file" id="json-input" class="hidden" accept=".json">
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col lg:flex-row gap-6 p-6 overflow-hidden h-full">
+        
+        <!-- Kolom Kiri: Input Zone -->
+        <section class="w-full lg:w-1/3 flex flex-col gap-4 overflow-hidden relative">
+            
+            <!-- Area Paste/Upload -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col shrink-0">
+                <div class="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
+                        <i data-lucide="image-plus" class="w-4 h-4"></i> Area Input Dokumen
+                    </h2>
+                </div>
+                <div class="p-4">
+                    <!-- Dropzone -->
+                    <div id="dropzone" tabindex="0" class="w-full border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-center transition-all duration-200 hover:bg-gray-50 hover:border-blue-400 focus:border-blue-500 focus:bg-blue-50 focus:ring-4 focus:ring-blue-100 outline-none cursor-text relative py-6">
+                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-2">
+                            <i data-lucide="mouse-pointer-click" class="w-5 h-5 animate-pulse"></i>
+                        </div>
+                        <h3 class="text-sm font-semibold text-gray-800 mb-1 pointer-events-none">Klik, Lalu <kbd class="bg-white border border-gray-300 rounded px-1 shadow-sm text-blue-600 font-mono text-xs mx-1">Ctrl + V</kbd></h3>
+                        <p class="text-xs text-gray-500 mb-3 pointer-events-none">atau drop file Gambar / PDF</p>
+                        <button class="bg-white border shadow-sm border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors pointer-events-auto z-10" onclick="document.getElementById('file-input').click()">
+                            Pilih File Manual
+                        </button>
+                        <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/jpg, image/webp, application/pdf">
+                    </div>
+
+                    <!-- Pilihan Mode AI & Engine -->
+                    <div class="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex flex-col gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-indigo-900 mb-1 flex items-center gap-1">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-600"></i> Mode Pemindaian
+                            </label>
+                            <select id="scan-mode" class="w-full bg-white border border-indigo-200 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none shadow-sm cursor-pointer">
+                                <option value="offline" selected>⚡ Standar: Teks Biasa (Offline Tesseract)</option>
+                                <option value="ai-text">🧠 AI Cerdas: Teks & Layout Kompleks</option>
+                                <option value="ai-table">📊 AI Cerdas: Ekstrak ke Tabel</option>
+                                <option value="ai-chart">📈 AI Cerdas: Analisis Diagram/Grafik</option>
+                            </select>
+                        </div>
+                        
+                        <div id="ai-model-container" class="hidden">
+                            <label class="block text-xs font-bold text-indigo-900 mb-1 flex items-center gap-1">
+                                <i data-lucide="cpu" class="w-3.5 h-3.5 text-indigo-600"></i> Model AI
+                            </label>
+                            <select id="ai-model" class="w-full bg-white border border-indigo-200 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none shadow-sm cursor-pointer">
+                                <option value="gemini-3.1-flash">Gemini 3.1 Flash (Tercepat & Cerdas)</option>
+                                <option value="gemini-2.5-flash-preview-09-2025" selected>Gemini 2.5 Flash (Stabil)</option>
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fallback)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Area Preview Gambar Aktif -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col flex-grow overflow-hidden">
+                <div class="p-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
+                    <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
+                        <i data-lucide="image" class="w-4 h-4"></i> Preview (Tab Aktif)
+                    </h2>
+                </div>
+                <div class="flex-grow relative bg-gray-100 p-2 overflow-hidden flex items-center justify-center min-h-[150px]">
+                    <img id="image-preview" src="" alt="Preview" class="hidden max-w-full max-h-full object-contain rounded shadow-sm border border-gray-200 bg-white">
+                    <div id="empty-preview-state" class="text-gray-400 text-sm flex flex-col items-center">
+                        <i data-lucide="image-off" class="w-8 h-8 mb-2 opacity-50"></i>
+                        Pilih tab di sebelah kanan
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Kolom Kanan: Output Zone -->
+        <section class="w-full lg:w-2/3 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden relative">
+            
+            <div class="border-b border-gray-100 bg-gray-50 flex flex-col shrink-0">
+                <div class="p-3 flex justify-between items-center">
+                    <h2 class="font-semibold text-gray-700 flex items-center gap-2 text-sm">
+                        <i data-lucide="file-text" class="w-4 h-4"></i> Hasil Ekstraksi
+                    </h2>
+                    <!-- Progress Bar Container -->
+                    <div id="progress-container" class="hidden flex items-center gap-2 text-xs text-indigo-600 font-medium">
+                        <div class="loader" style="width: 16px; height: 16px; border-width: 2px; border-top-color: #4f46e5;"></div>
+                        <span id="progress-text">Memproses: 0%</span>
+                    </div>
+                </div>
+                <!-- Tabs Container -->
+                <div id="tabs-container" class="flex overflow-x-auto border-t border-gray-200 bg-gray-100 px-2 pt-2 gap-1 items-end min-h-[42px]">
+                    <!-- Tabs will be generated here -->
+                </div>
+            </div>
+
+            <!-- Textarea Editor -->
+            <div class="flex-grow p-4 relative">
+                <textarea id="result-text" class="w-full h-full resize-none outline-none text-gray-800 bg-transparent leading-relaxed" placeholder="Teks, tabel, atau rangkuman diagram hasil scan akan muncul di sini... Anda bebas mengedit hasil ini." disabled></textarea>
+                
+                <!-- Overlay saat menunggu gambar -->
+                <div id="empty-state-overlay" class="absolute inset-0 bg-white/90 flex flex-col items-center justify-center text-gray-400 pointer-events-none z-10">
+                    <i data-lucide="files" class="w-12 h-12 mb-3 opacity-50"></i>
+                    <p class="text-sm">Belum ada file. Silakan Paste / Upload dokumen di sebelah kiri.</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons Footer -->
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex gap-3 justify-end shrink-0">
+                <button id="copy-btn" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm" disabled>
+                    <i data-lucide="copy" class="w-4 h-4"></i> Copy Hasil
+                </button>
+                <button id="export-btn" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm shadow-sm" disabled>
+                    <i data-lucide="file-down" class="w-4 h-4"></i> Export ke Word
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 pointer-events-none max-w-sm">
+        <span id="toast-icon-success"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-400"></i></span>
+        <span id="toast-icon-error" class="hidden"><i data-lucide="alert-circle" class="w-5 h-5 text-red-400"></i></span>
+        <span id="toast-message" class="text-sm font-medium">Notifikasi</span>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Inisialisasi Icon
+        lucide.createIcons();
+
+        // Konfigurasi Worker untuk PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // Elemen DOM
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const imagePreview = document.getElementById('image-preview');
+        const emptyPreviewState = document.getElementById('empty-preview-state');
+        
+        const scanModeSelect = document.getElementById('scan-mode');
+        const aiModelContainer = document.getElementById('ai-model-container');
+        const aiModelSelect = document.getElementById('ai-model');
+        
+        const apiKeyInput = document.getElementById('api-key-input');
+        const apiKeyContainer = document.getElementById('api-key-container');
+        const toggleKeyBtn = document.getElementById('toggle-key-btn');
+        const toggleKeyIcon = document.getElementById('toggle-key-icon');
+
+        const tabsContainer = document.getElementById('tabs-container');
+        const resultText = document.getElementById('result-text');
+        const emptyStateOverlay = document.getElementById('empty-state-overlay');
+        const progressContainer = document.getElementById('progress-container');
+        const progressText = document.getElementById('progress-text');
+        
+        const copyBtn = document.getElementById('copy-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const exportJsonBtn = document.getElementById('export-json-btn');
+        const importJsonBtn = document.getElementById('import-json-btn');
+        const jsonInput = document.getElementById('json-input');
+        
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        const toastIconSuccess = document.getElementById('toast-icon-success');
+        const toastIconError = document.getElementById('toast-icon-error');
+
+        // --- STATE MANAGEMENT ---
+        let documents = [];
+        let activeDocId = null;
+        let globalProcessingLock = false; 
+
+        // Auto-load dari LocalStorage
+        function loadData() {
+            try {
+                // Load API Key
+                const savedKey = localStorage.getItem('gemini_api_key');
+                if (savedKey) apiKeyInput.value = savedKey;
+
+                // Load Docs
+                const saved = localStorage.getItem('webocr_data');
+                if (saved) {
+                    documents = JSON.parse(saved);
+                    documents.forEach(d => d.isProcessing = false);
+                    if (documents.length > 0) {
+                        activeDocId = documents[documents.length - 1].id;
+                    }
+                }
+            } catch (e) {
+                console.error("Gagal memuat data lokal", e);
+            }
+            render();
+            updateModelVisibility();
+        }
+
+        // Auto-save State ke LocalStorage
+        function saveData() {
+            try {
+                localStorage.setItem('webocr_data', JSON.stringify(documents));
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    showToast("Penyimpanan browser penuh. Hapus tab lama.", true);
+                }
+            }
+        }
+
+        // --- BYOK (API KEY) LOGIC ---
+        apiKeyInput.addEventListener('input', (e) => {
+            localStorage.setItem('gemini_api_key', e.target.value);
+        });
+
+        toggleKeyBtn.addEventListener('click', () => {
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                toggleKeyIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                apiKeyInput.type = 'password';
+                toggleKeyIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        });
+
+        // Validasi API Key
+        function validateApiKeyForAI() {
+            const currentMode = scanModeSelect.value;
+            if (currentMode !== 'offline' && !apiKeyInput.value.trim()) {
+                // Beri efek shake dan warna merah pada kotak API key
+                apiKeyContainer.classList.add('ring-2', 'ring-red-500', 'animate-shake', 'border-red-500');
+                apiKeyInput.focus();
+                
+                setTimeout(() => {
+                    apiKeyContainer.classList.remove('ring-2', 'ring-red-500', 'animate-shake', 'border-red-500');
+                }, 1000);
+
+                showToast("API Key Google Gemini wajib diisi untuk menggunakan Mode AI!", true);
+                return false;
+            }
+            return true;
+        }
+
+        // Toggle dropdown model jika mode AI dipilih
+        scanModeSelect.addEventListener('change', updateModelVisibility);
+        function updateModelVisibility() {
+            if (scanModeSelect.value === 'offline') {
+                aiModelContainer.classList.add('hidden');
+            } else {
+                aiModelContainer.classList.remove('hidden');
+            }
+        }
+
+        // --- HELPER FUNGSI ---
+        function extractBase64Data(dataUrl) {
+            const parts = dataUrl.split(',');
+            return parts.length > 1 ? parts[1] : '';
+        }
+
+        function extractMimeType(dataUrl) {
+            const match = dataUrl.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/);
+            return match ? match[1] : 'image/jpeg';
+        }
+
+        // --- GEMINI AI INTEGRATION API ---
+        async function fetchGeminiWithRetry(prompt, base64Image, mimeType, apiKey, modelName) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: mimeType, data: base64Image } }
+                    ]
+                }]
+            };
+
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < delays.length + 1; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errBody = await response.text();
+                        throw new Error(`Error API (${response.status}): Cek API Key Anda. ${errBody}`);
+                    }
+                    
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, AI gagal menghasilkan teks.";
+                } catch (error) {
+                    console.error(`Attempt ${i+1} failed:`, error);
+                    if (i === delays.length) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        // --- RENDER UI ---
+        function render() {
+            renderTabs();
+            renderActiveContent();
+            saveData(); 
+        }
+
+        function renderTabs() {
+            tabsContainer.innerHTML = '';
+            
+            documents.forEach((doc, index) => {
+                const isActive = doc.id === activeDocId;
+                const tab = document.createElement('div');
+                
+                tab.className = `flex items-center gap-2 px-4 py-2 rounded-t-lg border-t border-l border-r cursor-pointer text-sm font-medium transition-colors select-none ${
+                    isActive ? 'bg-white border-gray-200 text-indigo-600 shadow-[0_4px_0_0_#fff]' : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200 mt-1'
+                }`;
+                if(isActive) tab.style.zIndex = '1';
+                
+                tab.onclick = () => {
+                    activeDocId = doc.id;
+                    render();
+                };
+
+                const title = document.createElement('span');
+                title.textContent = doc.title || `File ${index + 1}`;
+                title.className = "whitespace-nowrap max-w-[100px] truncate";
+
+                if (doc.isProcessing) {
+                    const spinner = document.createElement('div');
+                    spinner.className = "loader ml-1";
+                    spinner.style.cssText = "width: 12px; height: 12px; border-width: 2px; border-top-color: #4f46e5;";
+                    title.appendChild(spinner);
+                }
+
+                const closeBtn = document.createElement('span');
+                closeBtn.innerHTML = '<i data-lucide="x" class="w-3.5 h-3.5 hover:text-red-500 transition-colors"></i>';
+                closeBtn.className = "ml-1 opacity-60 hover:opacity-100 p-0.5 rounded hover:bg-red-50";
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if(doc.isProcessing) {
+                        showToast("Sedang diproses, tidak bisa dihapus!", true);
+                        return;
+                    }
+                    deleteDoc(doc.id);
+                };
+
+                tab.appendChild(title);
+                tab.appendChild(closeBtn);
+                tabsContainer.appendChild(tab);
+            });
+            lucide.createIcons();
+        }
+
+        function renderActiveContent() {
+            const activeDoc = documents.find(d => d.id === activeDocId);
+
+            if (!activeDoc) {
+                imagePreview.classList.add('hidden');
+                emptyPreviewState.classList.remove('hidden');
+                resultText.value = '';
+                resultText.disabled = true;
+                emptyStateOverlay.classList.remove('hidden');
+                copyBtn.disabled = true;
+                exportBtn.disabled = true;
+                progressContainer.classList.add('hidden');
+                progressContainer.classList.remove('flex');
+                resultText.classList.remove('font-mono-table');
+                return;
+            }
+
+            imagePreview.src = activeDoc.image;
+            imagePreview.classList.remove('hidden');
+            emptyPreviewState.classList.add('hidden');
+
+            if (activeDoc.mode === 'ai-table') {
+                resultText.classList.add('font-mono-table');
+            } else {
+                resultText.classList.remove('font-mono-table');
+            }
+
+            resultText.value = activeDoc.text;
+            resultText.disabled = activeDoc.isProcessing;
+            
+            if (activeDoc.isProcessing) {
+                emptyStateOverlay.classList.add('hidden');
+                copyBtn.disabled = true;
+                exportBtn.disabled = true;
+                progressContainer.classList.remove('hidden');
+                progressContainer.classList.add('flex');
+                progressText.textContent = activeDoc.mode === 'offline' ? "Engine lokal membaca..." : "AI sedang menganalisis...";
+            } else {
+                emptyStateOverlay.classList.add('hidden');
+                const hasText = activeDoc.text.trim() !== "";
+                copyBtn.disabled = !hasText;
+                exportBtn.disabled = !hasText;
+                progressContainer.classList.add('hidden');
+                progressContainer.classList.remove('flex');
+            }
+        }
+
+        function deleteDoc(id) {
+            documents = documents.filter(d => d.id !== id);
+            if (activeDocId === id) {
+                activeDocId = documents.length > 0 ? documents[documents.length - 1].id : null;
+            }
+            render();
+            showToast("Tab berhasil dihapus");
+        }
+
+        function showToast(message, isError = false) {
+            toastMessage.textContent = message;
+            if (isError) {
+                toastIconSuccess.classList.add('hidden');
+                toastIconError.classList.remove('hidden');
+            } else {
+                toastIconSuccess.classList.remove('hidden');
+                toastIconError.classList.add('hidden');
+            }
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 4000);
+        }
+
+        // --- FILE HANDLING ---
+        function handleFile(file) {
+            if (globalProcessingLock) {
+                showToast("Tunggu, sistem sedang memproses antrian!", true);
+                return;
+            }
+            
+            // Validasi API Key Sebelum Mulai Load File
+            if (!validateApiKeyForAI()) return;
+
+            if (!file) return;
+
+            if (file.type === 'application/pdf') {
+                processPDF(file);
+                return;
+            }
+
+            if (!file.type.startsWith('image/')) {
+                showToast("Harap masukkan file berupa Gambar atau PDF!", true);
+                return;
+            }
+
+            const currentMode = scanModeSelect.value;
+            const currentModel = aiModelSelect.value;
+            
+            globalProcessingLock = true;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const newDoc = {
+                    id: Date.now().toString(),
+                    image: e.target.result,
+                    text: "",
+                    isProcessing: true,
+                    title: `Gambar ${documents.length + 1}`,
+                    mode: currentMode
+                };
+                documents.push(newDoc);
+                activeDocId = newDoc.id;
+                render();
+                
+                startOCR(newDoc.id, e.target.result, currentMode, currentModel).finally(() => {
+                    globalProcessingLock = false;
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function processPDF(file) {
+            if (!validateApiKeyForAI()) return;
+
+            globalProcessingLock = true;
+            const currentMode = scanModeSelect.value;
+            const currentModel = aiModelSelect.value;
+
+            showToast("Mengekstrak halaman PDF...", false);
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const totalPages = pdf.numPages;
+                const pagesToProcess = Math.min(totalPages, 20); 
+                
+                for (let i = 1; i <= pagesToProcess; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 }); 
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    const newDocId = Date.now().toString() + '-' + i;
+                    const newDoc = {
+                        id: newDocId,
+                        image: imageDataUrl,
+                        text: "",
+                        isProcessing: true,
+                        title: `Hal PDF ${i}`,
+                        mode: currentMode
+                    };
+                    
+                    documents.push(newDoc);
+                    activeDocId = newDocId;
+                    render();
+
+                    await startOCR(newDocId, imageDataUrl, currentMode, currentModel);
+                }
+                
+                showToast(`Selesai memproses ${pagesToProcess} halaman PDF!`);
+            } catch (error) {
+                console.error("Error reading PDF:", error);
+                showToast("Gagal membaca struktur PDF.", true);
+            } finally {
+                globalProcessingLock = false;
+                render();
+            }
+        }
+
+        resultText.addEventListener('input', (e) => {
+            if(activeDocId) {
+                const doc = documents.find(d => d.id === activeDocId);
+                if(doc) {
+                    doc.text = e.target.value;
+                    saveData();
+                    const hasText = doc.text.trim() !== "";
+                    copyBtn.disabled = !hasText;
+                    exportBtn.disabled = !hasText;
+                }
+            }
+        });
+
+        // ENGINE PEMINDAIAN
+        async function startOCR(docId, imageDataUrl, mode, modelName) {
+            try {
+                let finalExtractedText = "";
+
+                if (mode === 'offline') {
+                    // Gunakan Tesseract.js Tradisional
+                    const result = await Tesseract.recognize(
+                        imageDataUrl,
+                        'ind+eng',
+                        {
+                            logger: m => {
+                                if (activeDocId === docId && progressText && mode === 'offline') {
+                                    if (m.status === 'recognizing text') {
+                                        const progress = Math.round(m.progress * 100);
+                                        progressText.textContent = `Membaca Teks Offline: ${progress}%`;
+                                    } else {
+                                        progressText.textContent = "Menyiapkan Engine...";
+                                    }
+                                }
+                            }
+                        }
+                    );
+                    finalExtractedText = result.data.text;
+                } 
+                else {
+                    // Tampilkan Notifikasi AI yang Sedang Bekerja
+                    const modelLabel = aiModelSelect.options[aiModelSelect.selectedIndex].text;
+                    showToast(`✨ Memproses dengan ${modelLabel}...`);
+                    
+                    if (activeDocId === docId && progressText) {
+                        progressText.textContent = `Mengirim ke ${modelLabel}...`;
+                    }
+                    
+                    const base64Data = extractBase64Data(imageDataUrl);
+                    const mimeType = extractMimeType(imageDataUrl);
+                    const apiKey = apiKeyInput.value.trim();
+                    
+                    let promptInstruction = "";
+                    if (mode === 'ai-text') {
+                        promptInstruction = "Ekstrak seluruh teks dari gambar ini dengan sangat akurat. Perhatikan dan pahami strukturnya, jika ada multi-kolom atau blok teks terpisah, baca sesuai urutan baca alami manusia. JANGAN buat deskripsi tentang gambarnya, cukup berikan murni ekstraksi teksnya saja.";
+                    } else if (mode === 'ai-table') {
+                        promptInstruction = "Analisis gambar ini dengan teliti dan ekstrak semua data yang ada. Format hasilnya secara ketat sebagai tabel Markdown (gunakan simbol pipa '|' sebagai pemisah kolom). Jika gambar ini tidak terlihat seperti tabel yang rapi, tetap usahakan menyusun datanya dengan struktur yang rapi dan terorganisir.";
+                    } else if (mode === 'ai-chart') {
+                        promptInstruction = "Analisis diagram, grafik, atau chart pada gambar ini secara komprehensif. Ekstrak titik-titik data utamanya. Jelaskan apa arti sumbu X/Y atau legendanya. Lalu, berikan ringkasan naratif (insight) tentang apa yang ingin disampaikan oleh grafik ini. Jawab dalam Bahasa Indonesia.";
+                    }
+
+                    finalExtractedText = await fetchGeminiWithRetry(promptInstruction, base64Data, mimeType, apiKey, modelName);
+                }
+
+                // Simpan hasil ke state
+                const doc = documents.find(d => d.id === docId);
+                if(doc) {
+                    doc.text = finalExtractedText;
+                    doc.isProcessing = false;
+                    render();
+                }
+
+            } catch (error) {
+                console.error("Kesalahan Scan:", error);
+                const doc = documents.find(d => d.id === docId);
+                if(doc) {
+                    doc.text = error.message || "Terjadi kesalahan sistem saat memproses gambar ini.";
+                    doc.isProcessing = false;
+                    render();
+                }
+                showToast(error.message, true);
+            }
+        }
+
+        // --- JSON IMPORT & EXPORT ---
+        exportJsonBtn.addEventListener('click', () => {
+            if(documents.length === 0) {
+                showToast("Tidak ada data untuk di-export", true);
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(documents));
+            const a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", `WebOCR_Backup_${new Date().getTime()}.json`);
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            showToast("Backup JSON berhasil diunduh");
+        });
+
+        importJsonBtn.addEventListener('click', () => {
+            if(globalProcessingLock) {
+                showToast("Tunggu proses selesai sebelum meload JSON", true);
+                return;
+            }
+            jsonInput.click();
+        });
+
+        jsonInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const importedData = JSON.parse(event.target.result);
+                    if(Array.isArray(importedData)) {
+                        documents = importedData;
+                        documents.forEach(d => d.isProcessing = false);
+                        activeDocId = documents.length > 0 ? documents[documents.length - 1].id : null;
+                        render();
+                        showToast("Data berhasil di-load dari JSON");
+                    } else {
+                        showToast("Format JSON tidak valid!", true);
+                    }
+                } catch(err) {
+                    showToast("Gagal membaca file JSON!", true);
+                }
+                jsonInput.value = ""; 
+            };
+            reader.readAsText(file);
+        });
+
+        // --- EVENT LISTENERS TAMBAHAN ---
+        dropzone.addEventListener('click', (e) => {
+            if(e.target !== fileInput && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {
+                dropzone.focus();
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if(!globalProcessingLock) dropzone.classList.add('border-indigo-500', 'bg-indigo-50');
+        });
+        dropzone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-indigo-500', 'bg-indigo-50');
+        });
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-indigo-500', 'bg-indigo-50');
+            if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+
+        window.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    handleFile(blob);
+                    break;
+                }
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            if(!resultText.value) return;
+            navigator.clipboard.writeText(resultText.value).then(() => {
+                showToast("Hasil berhasil disalin!");
+            }).catch(() => {
+                resultText.select();
+                document.execCommand('copy');
+                showToast("Hasil berhasil disalin!");
+            });
+        });
+
+        exportBtn.addEventListener('click', () => {
+            const text = resultText.value;
+            if(!text) return;
+
+            // PARSING MARKDOWN KE HTML AGAR RAPI DI WORD
+            // Menggunakan fungsi bawaan dari pustaka Marked.js
+            const htmlBody = marked.parse(text);
+
+            const htmlContent = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset='utf-8'>
+                    <title>Export Teks OCR</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; }
+                        h1, h2, h3, h4 { color: #333; margin-top: 1em; margin-bottom: 0.5em; }
+                        table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+                        th, td { border: 1px solid #000; padding: 8px; text-align: left; vertical-align: top; }
+                        th { background-color: #f2f2f2; font-weight: bold; }
+                        p { margin-bottom: 1em; }
+                        strong { font-weight: bold; }
+                        em { font-style: italic; }
+                    </style>
+                </head>
+                <body>
+                    ${htmlBody}
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Dokumen_AI_${new Date().getTime()}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast("Berhasil diexport ke Word dengan format Markdown HTML!");
+        });
+
+        // Initialize
+        loadData();
+
+    </script>
+</body>
+</html>
