@@ -363,11 +363,11 @@
                         <span data-i18n="aiModelLabel">AI Model</span>
                     </label>
 
-                    <select id="ai-model" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
-                        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Cepat & Stabil)</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Akurasi Tinggi)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Versi Sebelumnya)</option>
-                    </select>
+                <select id="ai-model" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer">
+                    <option value="gemini-2.5-flash" data-i18n-opt="model25Flash" selected>Gemini 2.5 Flash </option>
+                    <option value="gemini-2.5-pro" data-i18n-opt="model25Pro">Gemini 2.5 Pro </option>
+                    <option value="gemini-2.0-flash" data-i18n-opt="model20Flash">Gemini 2.0 Flash </option>
+                </select>
 
                 </div>
 
@@ -558,6 +558,10 @@ const LANGS = {
         modeAiChart: "📈 Smart AI: Analyze Charts/Diagrams",
         modeAiSummary: "📝 Smart AI: Summarize Document",
         aiModelLabel: "AI Model",
+        aiModelLabel: "AI Model",
+        model25Flash: "Gemini 2.5 Flash (Fast & Stable)",
+        model25Pro: "Gemini 2.5 Pro (High Accuracy)",
+        model20Flash: "Gemini 2.0 Flash (Legacy)",
         ocrLangLabel: "OCR Language",
         previewTitle: "Preview (Active Tab)",
         selectTabHint: "Select a tab on the right",
@@ -629,6 +633,10 @@ const LANGS = {
         modeAiChart: "📈 AI Cerdas: Analisis Diagram/Grafik",
         modeAiSummary: "📝 AI Cerdas: Rangkum Dokumen",
         aiModelLabel: "Model AI",
+        aiModelLabel: "Model AI",
+        model25Flash: "Gemini 2.5 Flash (Cepat & Stabil)",
+        model25Pro: "Gemini 2.5 Pro (Akurasi Tinggi)",
+        model20Flash: "Gemini 2.0 Flash (Versi Sebelumnya)",
         ocrLangLabel: "Bahasa OCR",
         previewTitle: "Preview (Tab Aktif)",
         selectTabHint: "Pilih tab di sebelah kanan",
