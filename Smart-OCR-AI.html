@@ -90,6 +90,7 @@
 
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -263,8 +264,8 @@
             <i data-lucide="scan-text" class="w-5 h-5"></i>
         </div>
         <div>
-            <h1 class="text-lg font-bold text-gray-900 leading-tight" data-i18n="appTitle">WebOCR Pro + AI</h1>
-            <p class="text-xs text-gray-400" data-i18n="appSubtitle">Extract Text, Tables & Diagram Analysis</p>
+            <h1 class="text-lg font-bold text-gray-900 leading-tight" data-i18n="appTitle">SmartOCR Pro + AI</h1>
+            <p class="text-xs text-gray-400" data-i18n="appSubtitle">Extract Text, Manuscripts, Tables & Diagram Analysis</p>
         </div>
     </div>
 
@@ -355,6 +356,7 @@
                     <option value="ai-table" data-i18n-opt="modeAiTable">📊 Smart AI: Extract to Table</option>
                     <option value="ai-chart" data-i18n-opt="modeAiChart">📈 Smart AI: Analyze Charts/Diagrams</option>
                     <option value="ai-summary" data-i18n-opt="modeAiSummary">📝 Smart AI: Summarize Document</option>
+                    <option value="ai-replicate" data-i18n-opt="modeAiReplicate">🎨 Smart AI: Restore Manuscript (Nano Banana)</option>
                 </select>
 
                 <div id="ai-model-container" class="hidden">
@@ -367,6 +369,7 @@
                     <option value="gemini-2.5-flash" data-i18n-opt="model25Flash" selected>Gemini 2.5 Flash </option>
                     <option value="gemini-2.5-pro" data-i18n-opt="model25Pro">Gemini 2.5 Pro </option>
                     <option value="gemini-2.0-flash" data-i18n-opt="model20Flash">Gemini 2.0 Flash </option>
+                    <option value="gemini-3.1-flash-image" data-i18n-opt="modelNanoBanana">Nano Banana (Gemini 3.1 Flash Image)</option>
                 </select>
 
                 </div>
@@ -515,7 +518,12 @@
 
                         <div class="export-menu-item" id="export-excel-btn">
                             <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
-                            <span>Export as Excel (.xlsx)</span>
+                            <span data-i18n="exportExcelBtn">Export as Excel (.xlsx)</span>
+                        </div>
+
+                        <div class="export-menu-item" id="export-pdf-btn" style="display: none;">
+                            <i data-lucide="file-image" class="w-4 h-4 text-red-500"></i>
+                            <span data-i18n="exportPdfBtn">Export to PDF (Images Only)</span>
                         </div>
 
                     </div>
@@ -539,8 +547,8 @@ lucide.createIcons();
 // ─── TRANSLATIONS ───────────────────────────────────────────────────────────
 const LANGS = {
     en: {
-        appTitle: "WebOCR Pro + AI",
-        appSubtitle: "Extract Text, Tables & Diagram Analysis — AI-Powered",
+        appTitle: "SmartOCR Pro + AI",
+        appSubtitle: "Extract Text, Manuscripts, Tables & Diagram Analysis — AI-Powered",
         apiKeyPlaceholder: "Enter Gemini API Key...",
         importTooltip: "Import",
         exportTooltip: "Save",
@@ -557,7 +565,6 @@ const LANGS = {
         modeAiTable: "📊 Smart AI: Extract to Table",
         modeAiChart: "📈 Smart AI: Analyze Charts/Diagrams",
         modeAiSummary: "📝 Smart AI: Summarize Document",
-        aiModelLabel: "AI Model",
         aiModelLabel: "AI Model",
         model25Flash: "Gemini 2.5 Flash (Fast & Stable)",
         model25Pro: "Gemini 2.5 Pro (High Accuracy)",
@@ -612,10 +619,15 @@ const LANGS = {
         promptTable: "Extract all data from this image and format it STRICTLY as a Markdown table. Do NOT include any introductory text, explanations, or conversational fillers. ONLY output the Markdown table starting with the header row and ensure you include the separator row (e.g., |---|---|).",
         promptChart: "Comprehensively analyze the diagram, graph, or chart in this image. Extract the main data points. Explain what the X/Y axes or legend mean. Then provide a narrative summary (insight) about what the chart conveys. Respond in English.",
         promptSummary: "Summarize the main content of this document image. Extract key points, main topics, and important details. Present the summary in a clear, structured format with bullet points where appropriate. Respond in English.",
+        modeAiReplicate: "🎨 Smart AI: Restore Manuscript (Nano Banana)",
+        modelNanoBanana: "Nano Banana (Gemini 3.1 Flash Image)",
+        promptReplicate: "You are a professional digital archivist. Analyze this handwritten manuscript and create a clean, noise-free, and highly accurate digital replica of the handwriting. Return ONLY the restored image output without any text.",
+        exportPdfBtn: "Export as PDF (Image Only)",
+        restoredImageToast: "Restored manuscript saved to PDF!",
     },
     id: {
-        appTitle: "WebOCR Pro + AI",
-        appSubtitle: "Ekstrak Teks, Tabel, & Analisis Diagram secara Pintar",
+        appTitle: "SmartOCR Pro + AI",
+        appSubtitle: "Ekstrak Teks, Manuskrip, Tabel, & Analisis Diagram secara Pintar",
         apiKeyPlaceholder: "Masukkan Gemini API Key...",
         importTooltip: "Import",
         exportTooltip: "Simpan",
@@ -687,6 +699,11 @@ const LANGS = {
         promptTable: "Ekstrak semua data dari gambar ini dan format HANYA sebagai tabel Markdown. JANGAN berikan teks pengantar, basa-basi, atau penjelasan apapun. HANYA keluarkan tabel Markdown yang diawali dengan baris header dan pastikan ada baris pemisah (contoh: |---|---|).",
         promptChart: "Analisis diagram, grafik, atau chart secara komprehensif. Ekstrak data utama, jelaskan sumbu X/Y atau legenda, dan berikan ringkasan naratif (insight). Jawab dalam Bahasa Indonesia.",
         promptSummary: "Rangkum konten utama dari gambar dokumen ini. Ekstrak poin-poin kunci, topik utama, dan detail penting dalam format yang jelas dan terstruktur. Jawab dalam Bahasa Indonesia.",
+        modeAiReplicate: "🎨 AI Cerdas: Restorasi Manuskrip (Nano Banana)",
+        modelNanoBanana: "Nano Banana (Gemini 3.1 Flash Image)",
+        promptReplicate: "Anda adalah ahli restorasi digital. Analisis manuskrip tulisan tangan ini dan buat replika digital tulisan tangan yang bersih, tanpa noda/noise, dengan akurasi maksimum. Hasilkan HANYA output gambar.",
+        exportPdfBtn: "Export ke PDF (Hanya Gambar)",
+        restoredImageToast: "Manuskrip berhasil disimpan ke PDF!",
     }
 };
 
@@ -931,6 +948,11 @@ function updateModeVisibility() {
     const isAI = scanModeSelect.value !== 'offline';
     aiModelContainer.classList.toggle('hidden', !isAI);
     ocrLangContainer.classList.toggle('hidden', isAI);
+    
+    // Auto Select Nano Banana jika mode Replikasi Gambar aktif
+    if (scanModeSelect.value === 'ai-replicate') {
+        document.getElementById('ai-model').value = 'gemini-3.1-flash-image';
+    }
 }
 
 function validateApiKey() {
@@ -1013,12 +1035,30 @@ function renderActiveContent() {
         activModeBadge.textContent = 'OFFLINE OCR';
         activModeBadge.classList.add('mode-offline');
     } else {
-        const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-summary':'AI SUMMARY' };
+        const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-summary':'AI SUMMARY', 'ai-replicate':'AI REPLICATE' };
         activModeBadge.textContent = modeLabels[doc.mode] || 'AI';
         activModeBadge.classList.add('mode-ai');
     }
 
-    resultText.classList.toggle('font-mono-table', doc.mode === 'ai-table');
+    // --- LOGIKA LANGKAH 6 YANG BENAR ---
+    // Tampilkan Textarea / Gambar Output
+    if (doc.mode === 'ai-replicate' && doc.outputImage) {
+        resultText.classList.add('hidden');
+        visualPreview.classList.remove('hidden');
+        visualPreview.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <p class="text-sm text-green-600 font-semibold mb-3 flex items-center gap-2">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i> Manuskrip Berhasil Di-restore!
+                </p>
+                <img src="${doc.outputImage}" class="max-w-full rounded shadow-md border border-gray-200">
+            </div>`;
+    } else {
+        if (!isVisualView) {
+            resultText.classList.remove('hidden');
+            visualPreview.classList.add('hidden');
+        }
+    }
+    
     resultText.value = doc.text;
     resultText.disabled = doc.isProcessing;
     updateWordCount();
@@ -1034,18 +1074,29 @@ function renderActiveContent() {
     } else {
         emptyStateOverlay.classList.add('hidden');
         const hasText = doc.text.trim() !== '';
+        const hasImage = !!doc.outputImage;
+        
         copyBtn.disabled = !hasText;
-        exportMainBtn.disabled = !hasText;
+        exportMainBtn.disabled = !(hasText || hasImage);
         progressContainer.classList.add('hidden');
         progressContainer.classList.remove('flex');
 
-                if (hasText) {
+        // LOGIKA MENU EXPORT (Hanya PDF untuk Manuskrip, sisanya di-hide)
+        const isReplicate = doc.mode === 'ai-replicate';
+        document.getElementById('export-word-btn').style.display = isReplicate ? 'none' : 'flex';
+        document.getElementById('export-txt-btn').style.display = isReplicate ? 'none' : 'flex';
+        document.getElementById('export-md-btn').style.display = isReplicate ? 'none' : 'flex';
+        document.getElementById('export-excel-btn').style.display = isReplicate ? 'none' : 'flex';
+        
+        const pdfBtn = document.getElementById('export-pdf-btn');
+        if(pdfBtn) pdfBtn.style.display = isReplicate ? 'flex' : 'none';
+
+        if (hasText && !isReplicate) {
             toggleViewBtn.classList.remove('hidden');
             if (isVisualView) visualPreview.innerHTML = marked.parse(doc.text);
         } else {
             toggleViewBtn.classList.add('hidden');
         }
-
     }
 }
 
@@ -1096,31 +1147,101 @@ function loadImageFile(file) {
     reader.readAsDataURL(file);
 }
 
+// --- FUNGSI BARU: Parser rentang halaman (contoh input: "1-5, 8, 11-13") ---
+function parsePageRange(input, maxPage) {
+    if (!input || !input.trim()) return [];
+    let pages = new Set();
+    const parts = input.split(',');
+    
+    for (let part of parts) {
+        part = part.trim();
+        if (part.includes('-')) {
+            const [start, end] = part.split('-').map(num => parseInt(num.trim(), 10));
+            if (!isNaN(start) && !isNaN(end) && start <= end) {
+                for (let i = Math.max(1, start); i <= Math.min(maxPage, end); i++) {
+                    pages.add(i);
+                }
+            }
+        } else {
+            const num = parseInt(part, 10);
+            if (!isNaN(num) && num >= 1 && num <= maxPage) {
+                pages.add(num);
+            }
+        }
+    }
+    // Return array yang sudah diurutkan
+    return Array.from(pages).sort((a, b) => a - b);
+}
+
 async function processPDF(file) {
     if (globalProcessingLock) { showToast(t('processingLockToast'), true); return; }
     globalProcessingLock = true;
     const mode = scanModeSelect.value;
     const model = aiModelSelect.value;
+    const MAX_PAGES = 35; // Batas limit RAM browser
+
     showToast(t('pdfExtractingToast'));
     try {
         const buf = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-        const pages = Math.min(pdf.numPages, 35);
-        for (let i = 1; i <= pages; i++) {
+        let pagesToProcess = [];
+
+        // CEK JIKA HALAMAN MELEBIHI BATAS
+        if (pdf.numPages > MAX_PAGES) {
+            const msg = `⚠️ RAM Limit Warning\n\nThis PDF file has ${pdf.numPages} pages.\nTo prevent the browser from crashing/hanging, a maximum of only ${MAX_PAGES} pages can be processed at once.\n\nEnter the page numbers you want to process:\n(Format: 1-10, 15, 20-22)\n\nOr leave it blank and click OK to automatically process the first ${MAX_PAGES} pages.`;  
+            const userInput = prompt(msg);
+
+            // Jika user menekan Cancel
+            if (userInput === null) {
+                globalProcessingLock = false;
+                showToast("PDF processing cancelled.", true);
+                return;
+            }
+
+            // Jika user membiarkan kosong, ambil halaman 1 sampai MAX_PAGES
+            if (userInput.trim() === "") {
+                for (let i = 1; i <= MAX_PAGES; i++) pagesToProcess.push(i);
+            } else {
+                // Parse inputan user
+                pagesToProcess = parsePageRange(userInput, pdf.numPages);
+
+                if (pagesToProcess.length === 0) {
+                    globalProcessingLock = false;
+                    showToast("Invalid page format! Processing cancelled.", true);
+                    return;
+                }
+
+                // Cegah user yang iseng masukin rentang lebih dari batas (misal: 1-100)
+                if (pagesToProcess.length > MAX_PAGES) {
+                    alert(`Your selection (${pagesToProcess.length} pages) exceeds the limit.\nThe system will truncate and only process ${MAX_PAGES} pages from your selection.`);
+                    pagesToProcess = pagesToProcess.slice(0, MAX_PAGES);
+                }
+            }
+        } else {
+            // Jika halaman aman (kurang dari sama dengan 35), ambil semua
+            for (let i = 1; i <= pdf.numPages; i++) pagesToProcess.push(i);
+        }
+
+        // Mulai memproses sesuai array halaman yang terpilih
+        for (let i of pagesToProcess) {
             const page = await pdf.getPage(i);
-            const vp = page.getViewport({ scale: 1.8 });
+            const vp = page.getViewport({ scale: 1.8 }); // Skala 1.8 sudah cukup berat untuk RAM
             const canvas = document.createElement('canvas');
             canvas.width = vp.width; canvas.height = vp.height;
             await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+            
             const imgUrl = canvas.toDataURL('image/jpeg', 0.85);
             const docId = `${Date.now()}-p${i}`;
             const doc = { id: docId, image: imgUrl, text: '', isProcessing: true, title: `PDF p.${i}`, mode };
+            
             documents.push(doc);
             activeDocId = docId;
             render();
+            
             await startOCR(docId, imgUrl, mode, model);
         }
-        showToast(t('pdfDoneToast', pages));
+        
+        showToast(t('pdfDoneToast', pagesToProcess.length));
     } catch(e) {
         console.error(e);
         showToast(t('pdfErrorToast'), true);
@@ -1157,12 +1278,28 @@ async function startOCR(docId, imgUrl, mode, modelName) {
                 'ai-table': t('promptTable'),
                 'ai-chart': t('promptChart'),
                 'ai-summary': t('promptSummary'),
+                'ai-replicate': t('promptReplicate'), // <== TAMBAHKAN INI
             };
-            text = await callGemini(prompts[mode] || t('promptText'), extractBase64(imgUrl), extractMime(imgUrl), apiKeyInput.value.trim(), modelName);
+            
+            // Deteksi apakah ini Nano Banana (minta output gambar)
+            const isImageOutput = mode === 'ai-replicate';
+            text = await callGemini(prompts[mode] || t('promptText'), extractBase64(imgUrl), extractMime(imgUrl), apiKeyInput.value.trim(), modelName, isImageOutput);
         }
 
         const doc = documents.find(d => d.id === docId);
-        if (doc) { doc.text = text; doc.isProcessing = false; render(); }
+        if (doc) { 
+            // Jika mode replikasi gambar, simpan ke outputImage. Jika tidak, simpan ke text.
+            if (mode === 'ai-replicate') {
+                doc.outputImage = text; 
+                doc.text = ""; 
+            } else {
+                doc.text = text; 
+                doc.outputImage = null;
+            }
+            doc.isProcessing = false; 
+            render(); 
+        }
+
     } catch(e) {
         console.error(e);
         const doc = documents.find(d => d.id === docId);
@@ -1171,15 +1308,26 @@ async function startOCR(docId, imgUrl, mode, modelName) {
     }
 }
 
-async function callGemini(prompt, base64, mime, apiKey, model) {
+async function callGemini(prompt, base64, mime, apiKey, model, isImageOutput = false) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = { contents: [{ role:'user', parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: base64 } }] }] };
     const delays = [1000, 2000, 4000, 8000];
+    
     for (let i = 0; i <= delays.length; i++) {
         const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
         if (res.ok) {
             const data = await res.json();
-            return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No output from AI.';
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            
+            // JIKA NANO BANANA ME-RETURN GAMBAR
+            if (isImageOutput) {
+                const imgPart = parts.find(p => p.inlineData);
+                if (imgPart) return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
+                throw new Error("AI gagal membuat gambar replika.");
+            }
+            
+            // JIKA ME-RETURN TEKS BIASA
+            return parts[0]?.text || 'No output from AI.';
         }
         if (i === delays.length) {
             const err = await res.text().catch(() => res.statusText);
@@ -1344,6 +1492,55 @@ exportExcelBtn.addEventListener('click', () => {
     XLSX.writeFile(workbook, `WebOCR_Data_${Date.now()}.xlsx`);
     showToast("Berhasil diexport ke Excel (.xlsx)!");
 });
+
+const exportPdfBtn = document.getElementById('export-pdf-btn');
+if (exportPdfBtn) {
+    exportPdfBtn.addEventListener('click', async () => {
+        exportMenu.classList.remove('open');
+        
+        // Cari SEMUA dokumen yang punya hasil gambar (outputImage)
+        const validDocs = documents.filter(d => d.outputImage);
+        
+        if (validDocs.length === 0) { 
+            showToast("Tidak ada gambar yang bisa di-export!", true); 
+            return; 
+        }
+        
+        showToast("Menyiapkan PDF, mohon tunggu...");
+        
+        // Panggil library jsPDF
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+        
+        // Gunakan looping asinkronous untuk memastikan gambar di-load berurutan
+        for (let i = 0; i < validDocs.length; i++) {
+            const doc = validDocs[i];
+            
+            await new Promise((resolve) => {
+                const img = new Image();
+                img.src = doc.outputImage;
+                img.onload = () => {
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    // Kalkulasi aspek rasio agar tidak gepeng
+                    const pdfHeight = (img.height * pdfWidth) / img.width; 
+                    
+                    // Jika ini BUKAN gambar pertama, tambahkan halaman baru di PDF
+                    if (i > 0) {
+                        pdf.addPage();
+                    }
+                    
+                    // Tempelkan gambar ke halaman PDF
+                    pdf.addImage(img, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    resolve(); // Lanjut ke gambar berikutnya
+                };
+            });
+        }
+        
+        // Setelah semua gambar selesai diproses, simpan PDF
+        pdf.save(`Restored_Manuscript_${Date.now()}.pdf`);
+        showToast(t('restoredImageToast'));
+    });
+}
 
 function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
