@@ -1,50 +1,45 @@
 /* ==========================================================================
-   DM Sans
+   DM Sans (v17)
    ========================================================================== */
-/* Regular (400) */
 @font-face {
   font-family: 'DM Sans';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('../fonts/dm-sans-v15-latin-regular.woff2') format('woff2');
+  src: url('../fonts/dm-sans-v17-latin-regular.woff2') format('woff2');
 }
 
-/* SemiBold (600) */
 @font-face {
   font-family: 'DM Sans';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('../fonts/dm-sans-v15-latin-600.woff2') format('woff2');
+  src: url('../fonts/dm-sans-v17-latin-600.woff2') format('woff2');
 }
 
-/* Bold (700) */
 @font-face {
   font-family: 'DM Sans';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('../fonts/dm-sans-v15-latin-700.woff2') format('woff2');
+  src: url('../fonts/dm-sans-v17-latin-700.woff2') format('woff2');
 }
 
 /* ==========================================================================
-   JetBrains Mono
+   JetBrains Mono (v24)
    ========================================================================== */
-/* Regular (400) */
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('../fonts/jetbrains-mono-v18-latin-regular.woff2') format('woff2');
+  src: url('../fonts/jetbrains-mono-v24-latin-regular.woff2') format('woff2');
 }
 
-/* Medium (500) */
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('../fonts/jetbrains-mono-v18-latin-500.woff2') format('woff2');
+  src: url('../fonts/jetbrains-mono-v24-latin-500.woff2') format('woff2');
 }
