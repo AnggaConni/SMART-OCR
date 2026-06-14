@@ -1303,7 +1303,8 @@ async function startOCR(docId, imgUrl, mode, modelName) {
             const ocrLang = ocrLangSelect.value;
 
             const result = await Tesseract.recognize(imgUrl, ocrLang, {
-                langPath: './assets/lang', // WAJIB ADA: Mengarahkan Tesseract untuk mencari file bahasa di folder lokal
+                langPath: './assets/lang', // Tetap arahkan ke folder lokal
+                gzip: false,               // WAJIB TAMBAH INI karena file kita full (buku .gz)
                 logger: m => {
 
                     if (activeDocId === docId && m.status === 'recognizing text') {
