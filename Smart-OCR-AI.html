@@ -95,6 +95,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/kilobtye/potrace@master/potrace.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
@@ -351,7 +353,9 @@
             </div>
             <div class="p-4 flex flex-col gap-3">
                 <select id="scan-mode" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-xl p-2.5 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 cursor-pointer transition-all">
-                    <option value="offline" data-i18n-opt="modeOffline">⚡ Standard: Plain Text (Offline OCR)</option>
+                    <option value="offline" data-i18n-opt="modeOffline" selected>⚡ Standard: Plain Text (Offline OCR)</option>
+                    <option value="offline-vector-bw" data-i18n-opt="modeVectorBW">🖋️ Standard: Vector B&W (Sharp Text)</option>
+                    <option value="offline-vector-color" data-i18n-opt="modeVectorColor">🎨 Standard: Vector Color (Logos/Art)</option>
                     <option value="ai-text" data-i18n-opt="modeAiText">🧠 Smart AI: Text &amp; Complex Layouts</option>
                     <option value="ai-table" data-i18n-opt="modeAiTable">📊 Smart AI: Extract to Table</option>
                     <option value="ai-chart" data-i18n-opt="modeAiChart">📈 Smart AI: Analyze Charts/Diagrams</option>
@@ -526,6 +530,11 @@
                             <span data-i18n="exportPdfBtn">Export to PDF (Images Only)</span>
                         </div>
 
+                        <div class="export-menu-item" id="export-svg-btn" style="display: none;">
+                            <i data-lucide="pen-tool" class="w-4 h-4 text-orange-500"></i>
+                            <span data-i18n="exportSvgBtn">Export as SVG (Vector)</span>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -624,6 +633,10 @@ const LANGS = {
         promptReplicate: "You are a professional digital archivist. Analyze this handwritten manuscript and create a clean, noise-free, and highly accurate digital replica of the handwriting. Return ONLY the restored image output without any text.",
         exportPdfBtn: "Export as PDF (Image Only)",
         restoredImageToast: "Restored manuscript saved to PDF!",
+        modeOfflineVector: "🎨 Standard: Auto Vectorize (Offline JS)",
+        exportSvgBtn: "Export as SVG (Vector)",
+        modeVectorBW: "🖋️ Standard: Vector B&W (Sharp Text)",
+        modeVectorColor: "🎨 Standard: Vector Color (Logos/Art)",
     },
     id: {
         appTitle: "SmartOCR Pro + AI",
@@ -704,6 +717,10 @@ const LANGS = {
         promptReplicate: "Anda adalah ahli restorasi digital. Analisis manuskrip tulisan tangan ini dan buat replika digital tulisan tangan yang bersih, tanpa noda/noise, dengan akurasi maksimum. Hasilkan HANYA output gambar.",
         exportPdfBtn: "Export ke PDF (Hanya Gambar)",
         restoredImageToast: "Manuskrip berhasil disimpan ke PDF!",
+        modeOfflineVector: "🎨 Standar: Auto Vector (Offline JS)",
+        exportSvgBtn: "Export ke SVG (Vektor)",
+        modeVectorBW: "🖋️ Standar: Vector Hitam-Putih (Teks Tajam)",
+        modeVectorColor: "🎨 Standar: Vector Berwarna (Logo/Seni)",
     }
 };
 
@@ -944,10 +961,16 @@ document.getElementById('toggle-key-btn').addEventListener('click', () => {
 });
 
 scanModeSelect.addEventListener('change', updateModeVisibility);
+
 function updateModeVisibility() {
-    const isAI = scanModeSelect.value !== 'offline';
+    // Mode dianggap AI JIKA TIDAK mengandung kata "offline"
+    const isAI = !scanModeSelect.value.startsWith('offline');
+    
+    // Sembunyikan AI Model jika mode offline
     aiModelContainer.classList.toggle('hidden', !isAI);
-    ocrLangContainer.classList.toggle('hidden', isAI);
+    
+    // Tampilkan bahasa OCR HANYA jika mode 'offline' (Bukan offline-vector)
+    ocrLangContainer.classList.toggle('hidden', scanModeSelect.value !== 'offline');
     
     // Auto Select Nano Banana jika mode Replikasi Gambar aktif
     if (scanModeSelect.value === 'ai-replicate') {
@@ -1035,20 +1058,29 @@ function renderActiveContent() {
         activModeBadge.textContent = 'OFFLINE OCR';
         activModeBadge.classList.add('mode-offline');
     } else {
-        const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-summary':'AI SUMMARY', 'ai-replicate':'AI REPLICATE' };
+        const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-summary':'AI SUMMARY', 'ai-replicate':'AI REPLICATE', 'offline-vector-bw':'VECTOR B&W', 'offline-vector-color':'VECTOR COLOR' };
         activModeBadge.textContent = modeLabels[doc.mode] || 'AI';
-        activModeBadge.classList.add('mode-ai');
+        
+        if (doc.mode.startsWith('offline-vector')) {
+            activModeBadge.classList.add('mode-offline');
+        } else {
+            activModeBadge.classList.add('mode-ai');
+        }
     }
 
-    // --- LOGIKA LANGKAH 6 YANG BENAR ---
     // Tampilkan Textarea / Gambar Output
-    if (doc.mode === 'ai-replicate' && doc.outputImage) {
+    if ((doc.mode === 'ai-replicate' || doc.mode.startsWith('offline-vector')) && doc.outputImage) {
         resultText.classList.add('hidden');
         visualPreview.classList.remove('hidden');
+        
+        const successMsg = doc.mode === 'ai-replicate' 
+            ? "Manuskrip Berhasil Di-restore!" 
+            : "Gambar Berhasil Di-vectorize!";
+
         visualPreview.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
                 <p class="text-sm text-green-600 font-semibold mb-3 flex items-center gap-2">
-                    <i data-lucide="check-circle-2" class="w-4 h-4"></i> Manuskrip Berhasil Di-restore!
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i> ${successMsg}
                 </p>
                 <img src="${doc.outputImage}" class="max-w-full rounded shadow-md border border-gray-200">
             </div>`;
@@ -1069,7 +1101,11 @@ function renderActiveContent() {
         exportMainBtn.disabled = true;
         progressContainer.classList.remove('hidden');
         progressContainer.classList.add('flex');
-        progressText.textContent = doc.mode === 'offline' ? t('localEngineReading') : t('aiAnalyzing');
+        
+        if (!doc.mode.startsWith('offline-vector')) {
+            progressText.textContent = doc.mode === 'offline' ? t('localEngineReading') : t('aiAnalyzing');
+        }
+        
         toggleViewBtn.classList.add('hidden');
     } else {
         emptyStateOverlay.classList.add('hidden');
@@ -1081,17 +1117,22 @@ function renderActiveContent() {
         progressContainer.classList.add('hidden');
         progressContainer.classList.remove('flex');
 
-        // LOGIKA MENU EXPORT (Hanya PDF untuk Manuskrip, sisanya di-hide)
+        // LOGIKA MENU EXPORT BARU
         const isReplicate = doc.mode === 'ai-replicate';
-        document.getElementById('export-word-btn').style.display = isReplicate ? 'none' : 'flex';
-        document.getElementById('export-txt-btn').style.display = isReplicate ? 'none' : 'flex';
-        document.getElementById('export-md-btn').style.display = isReplicate ? 'none' : 'flex';
-        document.getElementById('export-excel-btn').style.display = isReplicate ? 'none' : 'flex';
+        const isVector = doc.mode.startsWith('offline-vector');
+        
+        document.getElementById('export-word-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
+        document.getElementById('export-txt-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
+        document.getElementById('export-md-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
+        document.getElementById('export-excel-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
         
         const pdfBtn = document.getElementById('export-pdf-btn');
-        if(pdfBtn) pdfBtn.style.display = isReplicate ? 'flex' : 'none';
+        if(pdfBtn) pdfBtn.style.display = (isReplicate || isVector) ? 'flex' : 'none';
 
-        if (hasText && !isReplicate) {
+        const svgBtn = document.getElementById('export-svg-btn');
+        if(svgBtn) svgBtn.style.display = isVector ? 'flex' : 'none';
+
+        if (hasText && !isReplicate && !isVector) {
             toggleViewBtn.classList.remove('hidden');
             if (isVisualView) visualPreview.innerHTML = marked.parse(doc.text);
         } else {
@@ -1260,38 +1301,54 @@ async function startOCR(docId, imgUrl, mode, modelName) {
             const result = await Tesseract.recognize(imgUrl, ocrLang, {
                 logger: m => {
                     if (activeDocId === docId && m.status === 'recognizing text') {
-                        const p = Math.round(m.progress * 100);
-                        progressText.textContent = t('readingOffline', p);
-                    } else if (activeDocId === docId) {
-                        progressText.textContent = t('preparingEngine');
-                    }
+                        progressText.textContent = t('readingOffline', Math.round(m.progress * 100));
+                    } else if (activeDocId === docId) { progressText.textContent = t('preparingEngine'); }
                 }
             });
             text = result.data.text;
+            
+        } else if (mode.startsWith('offline-vector')) {
+            // LOGIKA VECTOR PILIHAN EKSPLISIT
+            let svgString = "";
+
+            if (mode === 'offline-vector-color') {
+                // JIKA BERWARNA -> Pake ImageTracer dengan preset rapi
+                if (activeDocId === docId) progressText.textContent = "Tracing Color...";
+                svgString = await new Promise(resolve => {
+                    ImageTracer.imageToSVG(imgUrl, (svgstr) => resolve(svgstr), 'posterized2');
+                });
+            } else {
+                // JIKA HITAM PUTIH -> Pake Potrace (Sangat tajam untuk teks)
+                if (activeDocId === docId) progressText.textContent = "Tracing B&W (Sharp Edge)...";
+                svgString = await new Promise((resolve) => {
+                    Potrace.loadImageFromUrl(imgUrl);
+                    const checkLoad = setInterval(() => {
+                        if (Potrace.img && Potrace.img.complete) {
+                            clearInterval(checkLoad);
+                            Potrace.process(() => resolve(Potrace.getSVG(1)));
+                        }
+                    }, 50);
+                });
+            }
+            
+            text = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+
         } else {
             const modelLabel = aiModelSelect.options[aiModelSelect.selectedIndex]?.text || modelName;
             showToast(t('aiProcessingToast', modelLabel));
             if (activeDocId === docId) progressText.textContent = t('sendingToAI', modelLabel);
 
-            const prompts = {
-                'ai-text': t('promptText'),
-                'ai-table': t('promptTable'),
-                'ai-chart': t('promptChart'),
-                'ai-summary': t('promptSummary'),
-                'ai-replicate': t('promptReplicate'), // <== TAMBAHKAN INI
-            };
-            
-            // Deteksi apakah ini Nano Banana (minta output gambar)
+            const prompts = { 'ai-text': t('promptText'), 'ai-table': t('promptTable'), 'ai-chart': t('promptChart'), 'ai-summary': t('promptSummary'), 'ai-replicate': t('promptReplicate') };
             const isImageOutput = mode === 'ai-replicate';
             text = await callGemini(prompts[mode] || t('promptText'), extractBase64(imgUrl), extractMime(imgUrl), apiKeyInput.value.trim(), modelName, isImageOutput);
         }
 
         const doc = documents.find(d => d.id === docId);
         if (doc) { 
-            // Jika mode replikasi gambar, simpan ke outputImage. Jika tidak, simpan ke text.
-            if (mode === 'ai-replicate') {
+            if (mode === 'ai-replicate' || mode.startsWith('offline-vector')) {
                 doc.outputImage = text; 
                 doc.text = ""; 
+                if (mode.startsWith('offline-vector')) doc.rawSvg = decodeURIComponent(text.split(',')[1]); 
             } else {
                 doc.text = text; 
                 doc.outputImage = null;
@@ -1493,6 +1550,23 @@ exportExcelBtn.addEventListener('click', () => {
     showToast("Berhasil diexport ke Excel (.xlsx)!");
 });
 
+const exportSvgBtn = document.getElementById('export-svg-btn');
+if (exportSvgBtn) {
+    exportSvgBtn.addEventListener('click', () => {
+        exportMenu.classList.remove('open');
+        const doc = documents.find(d => d.id === activeDocId);
+        
+        if (!doc || !doc.rawSvg) { 
+            showToast("Tidak ada data Vektor untuk diexport!", true); 
+            return; 
+        }
+        
+        const blob = new Blob([doc.rawSvg], { type: 'image/svg+xml;charset=utf-8' });
+        triggerDownload(blob, `Vectorized_Result_${Date.now()}.svg`);
+        showToast("Berhasil export ke format SVG!");
+    });
+}
+
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 if (exportPdfBtn) {
     exportPdfBtn.addEventListener('click', async () => {
@@ -1604,6 +1678,51 @@ window.addEventListener('paste', e => {
         if (item.type.startsWith('image/')) { handleFile(item.getAsFile()); break; }
     }
 });
+
+// ==============================================================
+// KODE EXPORT SVG ALTERNATIF (OPTIMASI KHUSUS CORELDRAW)
+// ==============================================================
+const btnExportSvgVector = document.getElementById('export-svg-btn');
+if (btnExportSvgVector) {
+    btnExportSvgVector.addEventListener('click', () => {
+        const menuExp = document.getElementById('export-menu');
+        if(menuExp) menuExp.classList.remove('open'); // Tutup dropdown
+        
+        const doc = documents.find(d => d.id === activeDocId);
+        
+        // Pastikan dokumen memiliki data SVG murni (rawSvg)
+        if (!doc || !doc.rawSvg) { 
+            showToast("Tidak ada data Vektor untuk diexport!", true); 
+            return; 
+        }
+
+        // 1. Ambil data SVG mentah dari proses tracing
+        let cleanSvg = doc.rawSvg;
+
+        // 2. OPTIMASI 1: Pangkas angka desimal (Ini rahasia agar Corel tidak lag/crash)
+        // Mengubah koordinat seperti "12.123456789" menjadi "12.12" saja
+        // File size akan menyusut drastis hingga 40-60%!
+        cleanSvg = cleanSvg.replace(/\d+\.\d{3,}/g, (match) => {
+            return parseFloat(match).toFixed(2);
+        });
+
+        // 3. OPTIMASI 2: Hapus tag <desc> atau metadata kotor bawaan library
+        cleanSvg = cleanSvg.replace(/<desc>[\s\S]*?<\/desc>/gi, '');
+
+        // 4. OPTIMASI 3: Tambahkan Standar XML Declaration (Wajib untuk CorelDraw)
+        // Agar Corel tidak menganggap file ini sebagai grafik web biasa
+        if (!cleanSvg.includes('<?xml')) {
+            cleanSvg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + cleanSvg;
+        }
+        
+        // Buat file SVG Bersih dan jalankan download
+        const blob = new Blob([cleanSvg], { type: 'image/svg+xml;charset=utf-8' });
+        triggerDownload(blob, `Vectorized_Optimized_${Date.now()}.svg`);
+        
+        showToast("Berhasil export ke SVG (Versi Ringan/Optimized)!");
+    });
+}
+
 
 // ─── START ────────────────────────────────────────────────────────────────────
 loadData();
