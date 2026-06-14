@@ -88,17 +88,20 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="shortcut icon" href="favicon.svg" />
 
+    <!-- Google Fonts (Sudah 100% Offline) -->
+    <link rel="stylesheet" href="./assets/css/fonts.css">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/kilobtye/potrace@master/potrace.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- JavaScript Libraries (Sudah 100% Offline) -->
+    <script src="./assets/js/tailwind.js"></script>
+    <script src="./assets/js/jspdf.umd.min.js"></script>
+    <script src="./assets/js/tesseract.min.js"></script>
+    <script src="./assets/js/pdf.min.js"></script>
+    <script src="./assets/js/marked.min.js"></script>
+    <script src="./assets/js/lucide.min.js"></script>
+    <script src="./assets/js/imagetracer.js"></script>
+    <script src="./assets/js/potrace.js"></script>
+    <script src="./assets/js/xlsx.full.min.js"></script>
+
     <style>
         :root {
             --blue-vivid: #2563eb;
@@ -550,7 +553,8 @@
 </div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = './assets/js/pdf.worker.min.js';
+
 lucide.createIcons();
 
 // ─── TRANSLATIONS ───────────────────────────────────────────────────────────
@@ -657,7 +661,6 @@ const LANGS = {
         modeAiTable: "📊 AI Cerdas: Ekstrak ke Tabel",
         modeAiChart: "📈 AI Cerdas: Analisis Diagram/Grafik",
         modeAiSummary: "📝 AI Cerdas: Rangkum Dokumen",
-        aiModelLabel: "Model AI",
         aiModelLabel: "Model AI",
         model25Flash: "Gemini 2.5 Flash (Cepat & Stabil)",
         model25Pro: "Gemini 2.5 Pro (Akurasi Tinggi)",
@@ -1298,8 +1301,11 @@ async function startOCR(docId, imgUrl, mode, modelName) {
         let text = '';
         if (mode === 'offline') {
             const ocrLang = ocrLangSelect.value;
+
             const result = await Tesseract.recognize(imgUrl, ocrLang, {
+                langPath: './assets/lang', // WAJIB ADA: Mengarahkan Tesseract untuk mencari file bahasa di folder lokal
                 logger: m => {
+
                     if (activeDocId === docId && m.status === 'recognizing text') {
                         progressText.textContent = t('readingOffline', Math.round(m.progress * 100));
                     } else if (activeDocId === docId) { progressText.textContent = t('preparingEngine'); }
@@ -1550,23 +1556,6 @@ exportExcelBtn.addEventListener('click', () => {
     showToast("Berhasil diexport ke Excel (.xlsx)!");
 });
 
-const exportSvgBtn = document.getElementById('export-svg-btn');
-if (exportSvgBtn) {
-    exportSvgBtn.addEventListener('click', () => {
-        exportMenu.classList.remove('open');
-        const doc = documents.find(d => d.id === activeDocId);
-        
-        if (!doc || !doc.rawSvg) { 
-            showToast("Tidak ada data Vektor untuk diexport!", true); 
-            return; 
-        }
-        
-        const blob = new Blob([doc.rawSvg], { type: 'image/svg+xml;charset=utf-8' });
-        triggerDownload(blob, `Vectorized_Result_${Date.now()}.svg`);
-        showToast("Berhasil export ke format SVG!");
-    });
-}
-
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 if (exportPdfBtn) {
     exportPdfBtn.addEventListener('click', async () => {
@@ -1722,6 +1711,8 @@ if (btnExportSvgVector) {
         showToast("Berhasil export ke SVG (Versi Ringan/Optimized)!");
     });
 }
+
+
 
 
 // ─── START ────────────────────────────────────────────────────────────────────
