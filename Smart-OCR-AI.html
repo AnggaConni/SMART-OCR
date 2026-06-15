@@ -101,6 +101,8 @@
     <script src="./assets/js/imagetracer.js"></script>
     <script src="./assets/js/potrace.js"></script>
     <script src="./assets/js/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="./assets/css/leaflet.css">
+    <script src="./assets/js/leaflet.js"></script>
 
     <style>
         :root {
@@ -359,6 +361,7 @@
                     <option value="offline" data-i18n-opt="modeOffline" selected>⚡ Standard: Plain Text (Offline OCR)</option>
                     <option value="offline-vector-bw" data-i18n-opt="modeVectorBW">🖋️ Standard: Vector B&W (Sharp Text)</option>
                     <option value="offline-vector-color" data-i18n-opt="modeVectorColor">🎨 Standard: Vector Color (Logos/Art)</option>
+                    <option value="ai-map" data-i18n-opt="modeAiMap">🗺️ Manual: Map Digitizer (Georeference & Klik)</option>
                     <option value="ai-text" data-i18n-opt="modeAiText">🧠 Smart AI: Text &amp; Complex Layouts</option>
                     <option value="ai-table" data-i18n-opt="modeAiTable">📊 Smart AI: Extract to Table</option>
                     <option value="ai-chart" data-i18n-opt="modeAiChart">📈 Smart AI: Analyze Charts/Diagrams</option>
@@ -477,6 +480,40 @@
         <div class="flex-grow p-4 relative overflow-hidden">
             <textarea id="result-text" class="w-full h-full resize-none outline-none text-gray-800 bg-transparent leading-relaxed text-sm" disabled></textarea>
             <div id="visual-preview" class="w-full h-full overflow-auto bg-transparent text-sm hidden"></div>
+
+            <div id="map-preview-container" class="w-full h-full min-h-[400px] rounded-xl border border-gray-200 hidden relative overflow-hidden z-0">
+                <div id="map-preview" class="w-full h-full absolute inset-0"></div>
+                
+                <div class="absolute top-3 right-3 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-gray-200 z-[400] w-64">
+                    <h3 class="text-xs font-bold text-gray-700 mb-2 border-b pb-1">🎛️ Map Digitizer Control</h3>
+                    
+                    <label class="text-[10px] font-bold text-gray-500 uppercase mb-1 block">1. Opacity Peta Dasar</label>
+                    <input type="range" id="map-opacity" min="0" max="1" step="0.1" value="0.7" class="w-full mb-3 cursor-pointer">
+                    
+                    <label class="text-[10px] font-bold text-gray-500 uppercase mb-1 block">2. Mode Interaksi</label>
+                    <div class="flex flex-col gap-1.5 mb-3">
+                        <label class="flex items-center gap-2 text-xs cursor-pointer text-gray-700">
+                            <input type="radio" name="map-action" value="calibrate" checked class="text-indigo-600 focus:ring-indigo-500">
+                            <span>🔄 Geser Titik Kalibrasi</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs cursor-pointer text-gray-700">
+                            <input type="radio" name="map-action" value="digitize" class="text-indigo-600 focus:ring-indigo-500">
+                            <span>📍 Digitasi Titik Tunggal</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs cursor-pointer text-gray-700">
+                            <input type="radio" name="map-action" value="polygon" class="text-indigo-600 focus:ring-indigo-500">
+                            <span>📐 Digitasi Area (Poligon)</span>
+                        </label>
+                    </div>
+
+                    <div id="polygon-tools" class="hidden border-t pt-2">
+                        <button id="finish-polygon-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow transition-colors flex items-center justify-center gap-1">
+                            ✅ Simpan Area Poligon
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div id="empty-state-overlay" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center text-gray-400 pointer-events-none z-10">
                 <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mb-3">
                     <i data-lucide="files" class="w-8 h-8 text-indigo-400"></i>
@@ -521,6 +558,11 @@
                         <div class="export-menu-item" id="export-md-btn">
                             <i data-lucide="code" class="w-4 h-4 text-purple-500"></i>
                             <span data-i18n="exportMdBtn">Export as Markdown</span>
+                        </div>
+
+                        <div class="export-menu-item" id="export-geojson-btn" style="display: none;">
+                            <i data-lucide="map-pin" class="w-4 h-4 text-orange-500"></i>
+                            <span>Export as GeoJSON</span>
                         </div>
 
                         <div class="export-menu-item" id="export-excel-btn">
@@ -638,9 +680,11 @@ const LANGS = {
         exportPdfBtn: "Export as PDF (Image Only)",
         restoredImageToast: "Restored manuscript saved to PDF!",
         modeOfflineVector: "🎨 Standard: Auto Vectorize (Offline JS)",
+        modeAiMap: "🗺️ Smart AI: Analyze Maps & Distribution",
         exportSvgBtn: "Export as SVG (Vector)",
         modeVectorBW: "🖋️ Standard: Vector B&W (Sharp Text)",
         modeVectorColor: "🎨 Standard: Vector Color (Logos/Art)",
+        promptMap: "Analyze this distribution map or document. Identify all historical/cultural sites, objects, or distribution points mentioned. Extract their names, descriptions, and approximate or exact geographic coordinates (Latitude and Longitude). Return the data STRICTLY as a valid, single GeoJSON FeatureCollection object. Do NOT include markdown code blocks like ```json, descriptions, or conversational text. Output ONLY the raw GeoJSON.",
     },
     id: {
         appTitle: "SmartOCR Pro + AI",
@@ -721,9 +765,11 @@ const LANGS = {
         exportPdfBtn: "Export ke PDF (Hanya Gambar)",
         restoredImageToast: "Manuskrip berhasil disimpan ke PDF!",
         modeOfflineVector: "🎨 Standar: Auto Vector (Offline JS)",
+        modeAiMap: "🗺️ AI Cerdas: Analisis Peta & Distribusi",
         exportSvgBtn: "Export ke SVG (Vektor)",
         modeVectorBW: "🖋️ Standar: Vector Hitam-Putih (Teks Tajam)",
         modeVectorColor: "🎨 Standar: Vector Berwarna (Logo/Seni)",
+        promptMap: "Analyze this distribution map or document. Identify all historical/cultural sites, objects, or distribution points mentioned. Extract their names, descriptions, and approximate or exact geographic coordinates (Latitude and Longitude). Return the data STRICTLY as a valid, single GeoJSON FeatureCollection object. Do NOT include markdown code blocks like ```json, descriptions, or conversational text. Output ONLY the raw GeoJSON.",
     }
 };
 
@@ -735,6 +781,11 @@ let globalProcessingLock = false;
 let zoomLevel = 1;
 let searchMatches = [];
 let searchCurrent = -1;
+let currentMap = null;
+let digitizedFeatures = []; // Untuk menyimpan data titik yang diklik
+let currentPolygonCoords = []; // Menampung koordinat titik poligon yang sedang berjalan
+let tempPolygonLayer = null;   // Layer visual untuk melihat garis poligon sementara
+let mapOverlay = null; // Menyimpan gambar overlay
 
 // ─── DOM REFS ─────────────────────────────────────────────────────────────────
 const dropzone = document.getElementById('dropzone');
@@ -764,6 +815,7 @@ const exportJsonBtn = document.getElementById('export-json-btn');
 const exportExcelBtn = document.getElementById('export-excel-btn');
 const toggleViewBtn = document.getElementById('toggle-view-btn');
 const visualPreview = document.getElementById('visual-preview');
+const mapPreview = document.getElementById('map-preview');
 const toggleViewIcon = document.getElementById('toggle-view-icon');
 const toggleViewText = document.getElementById('toggle-view-text');
 const importJsonBtn = document.getElementById('import-json-btn');
@@ -993,6 +1045,141 @@ function validateApiKey() {
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
+
+function renderMapDigitizer(imageUrl) {
+    const container = document.getElementById('map-preview-container');
+    container.classList.remove('hidden');
+
+    // Reset data visual
+    digitizedFeatures = [];
+    currentPolygonCoords = [];
+    if (currentMap) { currentMap.remove(); }
+
+    // 1. Inisialisasi Peta
+    currentMap = L.map('map-preview').setView([-2.5489, 118.0149], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(currentMap);
+
+    // Bounding Box awal gambar di tengah Indonesia
+    let bounds = L.latLngBounds([[-6.0, 105.0], [2.0, 115.0]]);
+    mapOverlay = L.imageOverlay(imageUrl, bounds, { opacity: 0.7, interactive: true }).addTo(currentMap);
+
+    // 2. SOLUSI FIX PIN PECAH: Bikin penanda berbasis CSS murni (DivIcon)
+    const customCalibrationIcon = L.divIcon({
+        className: 'custom-calib-pin',
+        html: `<div style="background-color: #4f46e5; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.5); cursor: move;"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+    });
+
+    // Pasang marker kalibrasi sudut dengan ikon baru
+    const nwMarker = L.marker(bounds.getNorthWest(), { draggable: true, icon: customCalibrationIcon, title: "Geser sudut Kiri Atas" }).addTo(currentMap);
+    const seMarker = L.marker(bounds.getSouthEast(), { draggable: true, icon: customCalibrationIcon, title: "Geser sudut Kanan Bawah" }).addTo(currentMap);
+
+    function updateOverlayBounds() {
+        const newBounds = L.latLngBounds(nwMarker.getLatLng(), seMarker.getLatLng());
+        mapOverlay.setBounds(newBounds);
+    }
+    nwMarker.on('drag', updateOverlayBounds);
+    seMarker.on('drag', updateOverlayBounds);
+
+    // 3. Slider Transparansi
+    document.getElementById('map-opacity').addEventListener('input', function(e) {
+        if(mapOverlay) mapOverlay.setOpacity(e.target.value);
+    });
+
+    // Monitoring pergantian mode radio button
+    document.querySelectorAll('input[name="map-action"]').forEach(radio => {
+        radio.addEventListener('change', function(e) {
+            const polyTools = document.getElementById('polygon-tools');
+            polyTools.classList.toggle('hidden', e.target.value !== 'polygon');
+            
+            // Reset poligon jika pindah mode di tengah jalan
+            if(e.target.value !== 'polygon') {
+                resetTemporaryPolygon();
+            }
+        });
+    });
+
+    // 4. Logika Interaksi Klik di Peta
+    currentMap.on('click', function(e) {
+        const action = document.querySelector('input[name="map-action"]:checked').value;
+        
+        if (action === 'digitize') {
+            // MODE TITIK TUNGGAL
+            const siteName = prompt("📍 Masukkan nama lokasi/titik koordinat ini:");
+            if (!siteName) return;
+
+            L.circleMarker(e.latlng, {
+                radius: 6, fillColor: "#ef4444", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 1
+            }).addTo(currentMap).bindPopup(`<b>${siteName}</b>`).openPopup();
+
+            digitizedFeatures.push({
+                type: "Feature",
+                properties: { name: siteName },
+                geometry: { type: "Point", coordinates: [e.latlng.lng, e.latlng.lat] }
+            });
+
+        } else if (action === 'polygon') {
+            // MODE POLIGON (Kumpulkan koordinat)
+            currentPolygonCoords.push(e.latlng);
+            
+            // Gambar/Update garis area di layar secara real-time
+            if (tempPolygonLayer) { currentMap.removeLayer(tempPolygonLayer); }
+            
+            if (currentPolygonCoords.length === 1) {
+                // Jika baru 1 titik, gambar lingkaran kecil dulu
+                tempPolygonLayer = L.circleMarker(currentPolygonCoords[0], { radius: 4, fillColor: "#10b981" }).addTo(currentMap);
+            } else {
+                // Jika > 1 titik, hubungkan jadi bentuk area transparan
+                tempPolygonLayer = L.polygon(currentPolygonCoords, { color: "#10b981", fillColor: "#10b981", fillOpacity: 0.4 }).addTo(currentMap);
+            }
+        }
+    });
+
+    // 5. Tombol Simpan Poligon
+    document.getElementById('finish-polygon-btn').onclick = function() {
+        if (currentPolygonCoords.length < 3) {
+            alert("❌ Poligon minimal harus memiliki 3 titik sudut!");
+            return;
+        }
+
+        const areaName = prompt("📐 Masukkan nama wilayah/area sebaran ini:");
+        if (!areaName) return;
+
+        // Ubah koordinat menjadi format array standar GeoJSON [[Lng, Lat], [Lng, Lat], ...]
+        // Note: Format GeoJSON Polygon mewajibkan titik pertama dan terakhir harus SAMA (tertutup)
+        let geoJsonCoords = currentPolygonCoords.map(pt => [pt.lng, pt.lat]);
+        geoJsonCoords.push([currentPolygonCoords[0].lng, currentPolygonCoords[0].lat]); // Tutup loop poligon
+
+        // Simpan objek bertipe Polygon ke GeoJSON
+        digitizedFeatures.push({
+            type: "Feature",
+            properties: { name: areaName },
+            geometry: {
+                type: "Polygon",
+                coordinates: [geoJsonCoords] // Dibungkus array ganda sesuai standar GeoJSON
+            }
+        });
+
+        // Ubah warna poligon sementara menjadi permanen di peta (Warna Orange)
+        L.polygon(currentPolygonCoords, { color: "#d97706", fillColor: "#f59e0b", fillOpacity: 0.5 })
+         .addTo(currentMap)
+         .bindPopup(`<b>Area: ${areaName}</b>`);
+
+        // Reset tracking poligon untuk menggambar area berikutnya
+        resetTemporaryPolygon();
+        showToast(`Berhasil menyimpan area: ${areaName}`);
+    };
+
+    function resetTemporaryPolygon() {
+        if (tempPolygonLayer) { currentMap.removeLayer(tempPolygonLayer); }
+        currentPolygonCoords = [];
+        tempPolygonLayer = null;
+    }
+
+    currentMap.fitBounds(bounds);
+}
+
 function render() {
     renderTabs();
     renderActiveContent();
@@ -1046,6 +1233,8 @@ function renderActiveContent() {
         progressContainer.classList.add('hidden');
         resultText.classList.remove('font-mono-table');
         activModeBadge.classList.add('hidden');
+        // Menyembunyikan peta jika tidak ada dokumen aktif
+        document.getElementById('map-preview-container').classList.add('hidden'); 
         updateWordCount();
         return;
     }
@@ -1057,24 +1246,20 @@ function renderActiveContent() {
 
     // Mode badge
     activModeBadge.classList.remove('hidden', 'mode-offline', 'mode-ai');
-    if (doc.mode === 'offline') {
-        activModeBadge.textContent = 'OFFLINE OCR';
+    const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-map':'AI MAP', 'ai-summary':'AI SUMMARY', 'ai-replicate':'AI REPLICATE', 'offline-vector-bw':'VECTOR B&W', 'offline-vector-color':'VECTOR COLOR' };
+    activModeBadge.textContent = modeLabels[doc.mode] || 'AI';
+        
+    if (doc.mode.startsWith('offline-vector')) {
         activModeBadge.classList.add('mode-offline');
     } else {
-        const modeLabels = { 'ai-text':'AI TEXT', 'ai-table':'AI TABLE', 'ai-chart':'AI CHART', 'ai-summary':'AI SUMMARY', 'ai-replicate':'AI REPLICATE', 'offline-vector-bw':'VECTOR B&W', 'offline-vector-color':'VECTOR COLOR' };
-        activModeBadge.textContent = modeLabels[doc.mode] || 'AI';
-        
-        if (doc.mode.startsWith('offline-vector')) {
-            activModeBadge.classList.add('mode-offline');
-        } else {
-            activModeBadge.classList.add('mode-ai');
-        }
+        activModeBadge.classList.add('mode-ai');
     }
 
-    // Tampilkan Textarea / Gambar Output
+    // Tampilkan Textarea / Gambar Output / Peta
     if ((doc.mode === 'ai-replicate' || doc.mode.startsWith('offline-vector')) && doc.outputImage) {
         resultText.classList.add('hidden');
         visualPreview.classList.remove('hidden');
+        document.getElementById('map-preview-container').classList.add('hidden');
         
         const successMsg = doc.mode === 'ai-replicate' 
             ? "Manuskrip Berhasil Di-restore!" 
@@ -1087,7 +1272,13 @@ function renderActiveContent() {
                 </p>
                 <img src="${doc.outputImage}" class="max-w-full rounded shadow-md border border-gray-200">
             </div>`;
+    } else if (doc.mode === 'ai-map' && doc.image && !doc.isProcessing) {
+        // MODE PETA AKTIF (Hanya muncul jika proses file sudah selesai)
+        resultText.classList.add('hidden');
+        visualPreview.classList.add('hidden');
+        renderMapDigitizer(doc.image); 
     } else {
+        document.getElementById('map-preview-container').classList.add('hidden');
         if (!isVisualView) {
             resultText.classList.remove('hidden');
             visualPreview.classList.add('hidden');
@@ -1108,34 +1299,37 @@ function renderActiveContent() {
         if (!doc.mode.startsWith('offline-vector')) {
             progressText.textContent = doc.mode === 'offline' ? t('localEngineReading') : t('aiAnalyzing');
         }
-        
         toggleViewBtn.classList.add('hidden');
     } else {
         emptyStateOverlay.classList.add('hidden');
         const hasText = doc.text.trim() !== '';
         const hasImage = !!doc.outputImage;
+        const isMap = doc.mode === 'ai-map';
         
         copyBtn.disabled = !hasText;
-        exportMainBtn.disabled = !(hasText || hasImage);
+        exportMainBtn.disabled = !(hasText || hasImage || isMap); // Map selalu bisa di-export
         progressContainer.classList.add('hidden');
         progressContainer.classList.remove('flex');
 
-        // LOGIKA MENU EXPORT BARU
+        // LOGIKA MENU EXPORT
         const isReplicate = doc.mode === 'ai-replicate';
         const isVector = doc.mode.startsWith('offline-vector');
         
-        document.getElementById('export-word-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
-        document.getElementById('export-txt-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
-        document.getElementById('export-md-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
-        document.getElementById('export-excel-btn').style.display = (isReplicate || isVector) ? 'none' : 'flex';
+        document.getElementById('export-word-btn').style.display = (isReplicate || isVector || isMap) ? 'none' : 'flex';
+        document.getElementById('export-txt-btn').style.display = (isReplicate || isVector || isMap) ? 'none' : 'flex';
+        document.getElementById('export-md-btn').style.display = (isReplicate || isVector || isMap) ? 'none' : 'flex';
+        document.getElementById('export-excel-btn').style.display = (isReplicate || isVector || isMap) ? 'none' : 'flex';
         
+        const geojsonBtn = document.getElementById('export-geojson-btn');
+        if(geojsonBtn) geojsonBtn.style.display = isMap ? 'flex' : 'none';
+
         const pdfBtn = document.getElementById('export-pdf-btn');
         if(pdfBtn) pdfBtn.style.display = (isReplicate || isVector) ? 'flex' : 'none';
 
         const svgBtn = document.getElementById('export-svg-btn');
         if(svgBtn) svgBtn.style.display = isVector ? 'flex' : 'none';
 
-        if (hasText && !isReplicate && !isVector) {
+        if (hasText && !isReplicate && !isVector && !isMap) {
             toggleViewBtn.classList.remove('hidden');
             if (isVisualView) visualPreview.innerHTML = marked.parse(doc.text);
         } else {
@@ -1297,6 +1491,14 @@ async function processPDF(file) {
 
 // ─── OCR ENGINE ───────────────────────────────────────────────────────────────
 async function startOCR(docId, imgUrl, mode, modelName) {
+
+    // Jika modenya peta, matikan loading dan bypass AI karena ini mode manual
+    if (mode === 'ai-map') {
+        const doc = documents.find(d => d.id === docId);
+        if (doc) { doc.isProcessing = false; render(); }
+        return;
+    }
+
     try {
         let text = '';
         if (mode === 'offline') {
@@ -1345,7 +1547,7 @@ async function startOCR(docId, imgUrl, mode, modelName) {
             showToast(t('aiProcessingToast', modelLabel));
             if (activeDocId === docId) progressText.textContent = t('sendingToAI', modelLabel);
 
-            const prompts = { 'ai-text': t('promptText'), 'ai-table': t('promptTable'), 'ai-chart': t('promptChart'), 'ai-summary': t('promptSummary'), 'ai-replicate': t('promptReplicate') };
+            const prompts = { 'ai-text': t('promptText'), 'ai-table': t('promptTable'), 'ai-chart': t('promptChart'), 'ai-map': t('promptMap'), 'ai-summary': t('promptSummary'), 'ai-replicate': t('promptReplicate') };
             const isImageOutput = mode === 'ai-replicate';
             text = await callGemini(prompts[mode] || t('promptText'), extractBase64(imgUrl), extractMime(imgUrl), apiKeyInput.value.trim(), modelName, isImageOutput);
         }
@@ -1649,6 +1851,31 @@ jsonInput.addEventListener('change', e => {
     };
     reader.readAsText(file);
 });
+
+// ==============================================================
+// KODE EXPORT GEOJSON (PETA)
+// ==============================================================
+const exportGeoJsonBtn = document.getElementById('export-geojson-btn');
+if (exportGeoJsonBtn) {
+    exportGeoJsonBtn.addEventListener('click', () => {
+        exportMenu.classList.remove('open');
+        
+        if (digitizedFeatures.length === 0) { 
+            showToast("Belum ada titik yang didigitasi!", true); 
+            return; 
+        }
+
+        // Bungkus data array ke format standar GeoJSON
+        const geoJsonObj = {
+            type: "FeatureCollection",
+            features: digitizedFeatures
+        };
+
+        const blob = new Blob([JSON.stringify(geoJsonObj, null, 2)], { type: 'application/geo+json;charset=utf-8' });
+        triggerDownload(blob, `Manual_Digitized_Map_${Date.now()}.geojson`);
+        showToast("Berhasil diexport ke GeoJSON murni!");
+    });
+}
 
 // ─── DROP / PASTE / FILE EVENTS ───────────────────────────────────────────────
 fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); fileInput.value = ''; });
